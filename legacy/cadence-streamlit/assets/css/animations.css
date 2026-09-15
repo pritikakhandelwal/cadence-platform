@@ -1,0 +1,27 @@
+@keyframes glow{
+
+0%{
+
+box-shadow:0 0 10px #00CFFF;
+
+}
+
+50%{
+
+box-shadow:0 0 30px #00CFFF;
+
+}
+
+100%{
+
+box-shadow:0 0 10px #00CFFF;
+
+}
+
+}
+
+.glow{
+
+animation:glow 2s infinite;
+
+}

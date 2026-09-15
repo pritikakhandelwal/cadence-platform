@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.venv-cadence/
+venv/
+
+# Local runtime artifacts and data
+runtime/
+database/*.db
+data/user/
+data/professional/
+output/
+extracted_keypoints/
+
+# Secrets and test artifacts
+.streamlit/secrets.toml
+.pytest_cache/
+coverage.xml

@@ -1,0 +1,68 @@
+/* ===========================================
+   GOOGLE FONTS
+=========================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Rajdhani:wght@500;700&family=Poppins:wght@300;400;500;600&display=swap');
+
+/* ===========================================
+   COLOR VARIABLES
+=========================================== */
+
+:root{
+
+    --background:#0A0F1E;
+    --card:#151B2D;
+    --blue:#00CFFF;
+    --red:#FF2E63;
+    --green:#00E676;
+    --white:#F8FAFC;
+    --grey:#94A3B8;
+
+}
+
+/* ===========================================
+   MAIN APP
+=========================================== */
+
+.stApp{
+
+    background:
+        radial-gradient(circle at top left,#1D4ED8 0%,transparent 25%),
+        radial-gradient(circle at top right,#FF2E63 0%,transparent 25%),
+        linear-gradient(135deg,#050816,#0A0F1E,#111827);
+
+    background-attachment:fixed;
+
+    color:white;
+
+    font-family:'Poppins',sans-serif;
+
+}
+
+/* ===========================================
+   SCROLLBAR
+=========================================== */
+
+::-webkit-scrollbar{
+
+    width:8px;
+
+}
+
+::-webkit-scrollbar-thumb{
+
+    background:#00CFFF;
+
+    border-radius:20px;
+
+}
+
+/* ===========================================
+   HIDE ONLY FOOTER
+=========================================== */
+
+footer{
+
+    visibility:hidden;
+
+}

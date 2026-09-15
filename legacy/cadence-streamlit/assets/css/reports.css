@@ -1,0 +1,509 @@
+/* ==========================================================
+   REPORT PAGE
+========================================================== */
+
+.report-cover{
+
+background:linear-gradient(135deg,#0f172a,#111827,#1e293b);
+
+border-radius:26px;
+
+padding:28px;
+
+text-align:center;
+
+border:1px solid rgba(255,255,255,.08);
+
+box-shadow:0 20px 50px rgba(0,0,0,.35);
+
+margin-bottom:25px;
+
+}
+
+
+/* ==========================================================
+   CADENCE LOGO
+========================================================== */
+
+.cover-logo{
+
+font-size:38px;
+
+font-weight:800;
+
+letter-spacing:2px;
+
+margin-bottom:10px;
+
+color:#38bdf8;
+
+text-shadow:
+0 0 8px rgba(56,189,248,.8),
+0 0 16px rgba(56,189,248,.6),
+0 0 30px rgba(56,189,248,.4),
+0 0 45px rgba(96,165,250,.3);
+
+}
+
+
+/* ==========================================================
+   REPORT TITLE
+========================================================== */
+
+.cover-title{
+
+font-size:24px;
+
+font-weight:700;
+
+color:white;
+
+margin-bottom:8px;
+
+}
+
+.cover-subtitle{
+
+font-size:14px;
+
+color:#cbd5e1;
+
+margin-bottom:18px;
+
+}
+
+
+/* ==========================================================
+   USER INFO
+========================================================== */
+
+.cover-user{
+
+display:flex;
+
+justify-content:center;
+
+gap:18px;
+
+flex-wrap:wrap;
+
+margin-top:15px;
+
+}
+
+.cover-user div{
+
+background:#1e293b;
+
+padding:10px 18px;
+
+border-radius:12px;
+
+font-size:15px;
+
+font-weight:500;
+
+border:1px solid rgba(255,255,255,.08);
+
+color:#f8fafc;
+
+}
+
+
+/* ==========================================================
+   AI REPORT
+========================================================== */
+
+.report-summary{
+
+background:#111827;
+
+padding:30px;
+
+border-radius:22px;
+
+border:1px solid #334155;
+
+box-shadow:0 15px 40px rgba(0,0,0,.28);
+
+margin-bottom:25px;
+
+}
+
+.report-summary h2{
+
+text-align:center;
+
+font-size:28px;
+
+margin-bottom:25px;
+
+color:#38bdf8;
+
+}
+
+.report-summary h3{
+
+margin-top:25px;
+
+margin-bottom:12px;
+
+font-size:20px;
+
+color:#22c55e;
+
+}
+
+.report-summary hr{
+
+border:none;
+
+height:1px;
+
+background:#334155;
+
+margin:20px 0;
+
+}
+
+.report-summary ul{
+
+padding-left:22px;
+
+}
+
+.report-summary li{
+
+margin-bottom:12px;
+
+font-size:16px;
+
+line-height:1.8;
+
+color:#f1f5f9;
+
+}
+
+.report-summary p{
+
+margin-top:15px;
+
+padding:18px;
+
+border-left:4px solid #38bdf8;
+
+background:#1e293b;
+
+border-radius:12px;
+
+line-height:1.9;
+
+font-size:15px;
+
+color:#f8fafc;
+
+}
+
+
+/* ==========================================================
+   OVERALL GRADE
+========================================================== */
+
+.grade-card{
+
+background:linear-gradient(135deg,#2563eb,#1d4ed8,#1e40af);
+
+padding:45px;
+
+border-radius:24px;
+
+text-align:center;
+
+color:white;
+
+box-shadow:0 20px 45px rgba(37,99,235,.35);
+
+margin-bottom:25px;
+
+}
+
+.grade-card h1{
+
+font-size:70px;
+
+margin-bottom:12px;
+
+font-weight:800;
+
+}
+
+.grade-card h3{
+
+font-size:24px;
+
+margin-bottom:15px;
+
+font-weight:600;
+
+}
+
+.grade-card p{
+
+font-size:18px;
+
+line-height:1.8;
+
+}
+/* ==========================================================
+   AI RECOMMENDATION CARDS
+========================================================== */
+
+.recommendation-card{
+
+background:#111827;
+
+padding:18px 22px;
+
+margin-bottom:14px;
+
+border-radius:16px;
+
+border-left:5px solid #22c55e;
+
+box-shadow:0 10px 25px rgba(0,0,0,.20);
+
+font-size:15px;
+
+line-height:1.7;
+
+transition:all .25s ease;
+
+}
+
+.recommendation-card:hover{
+
+transform:translateX(6px);
+
+border-left-color:#38bdf8;
+
+box-shadow:0 14px 30px rgba(56,189,248,.20);
+
+}
+
+
+/* ==========================================================
+   DOWNLOAD BUTTON
+========================================================== */
+
+.stDownloadButton > button{
+
+width:100%;
+
+border-radius:14px;
+
+padding:12px;
+
+font-size:16px;
+
+font-weight:600;
+
+}
+
+
+/* ==========================================================
+   DIVIDER SPACING
+========================================================== */
+
+hr{
+
+margin-top:18px;
+
+margin-bottom:18px;
+
+}
+
+
+/* ==========================================================
+   MOBILE RESPONSIVE
+========================================================== */
+
+@media (max-width:768px){
+
+.cover-logo{
+
+font-size:30px;
+
+}
+
+.cover-title{
+
+font-size:20px;
+
+}
+
+.cover-user{
+
+flex-direction:column;
+
+align-items:center;
+
+gap:10px;
+
+}
+
+.cover-user div{
+
+width:100%;
+
+max-width:320px;
+
+}
+
+/* ==========================================================
+   OVERALL GRADE
+========================================================== */
+
+/* ==========================================================
+   OVERALL GRADE
+========================================================== */
+
+.grade-card{
+
+background:linear-gradient(135deg,#2563eb,#1d4ed8,#1e40af);
+
+padding:18px 28px;
+
+border-radius:20px;
+
+text-align:center;
+
+color:white;
+
+box-shadow:0 12px 30px rgba(37,99,235,.28);
+
+margin:15px auto;
+
+max-width:500px;
+
+}
+
+.grade-card h1{
+
+font-size:70px;
+
+font-weight:800;
+
+margin:0;
+
+line-height:1;
+
+}
+
+.grade-card h3{
+
+font-size:22px;
+
+font-weight:600;
+
+margin:6px 0 8px 0;
+
+}
+
+.grade-card p{
+
+font-size:16px;
+
+line-height:1.4;
+
+margin:0;
+
+}
+
+.grade-card p b{
+
+font-size:20px;
+
+}
+.grade-letter{
+
+font-size:34px;
+
+font-weight:800;
+
+line-height:1;
+
+margin:0;
+
+}
+
+.grade-remark{
+
+font-size:15px;
+
+font-weight:600;
+
+margin:6px 0;
+
+}
+
+.grade-score{
+
+font-size:13px;
+
+opacity:.95;
+
+}
+
+.report-summary{
+
+padding:22px;
+
+}
+
+.report-summary h2{
+
+font-size:22px;
+
+}
+
+.report-summary h3{
+
+font-size:18px;
+
+}
+
+}
+
+
+/* ==========================================================
+   SMOOTH ANIMATIONS
+========================================================== */
+
+.report-cover,
+.report-summary,
+.grade-card,
+.recommendation-card{
+
+animation:fadeIn .45s ease;
+
+}
+
+@keyframes fadeIn{
+
+from{
+
+opacity:0;
+
+transform:translateY(10px);
+
+}
+
+to{
+
+opacity:1;
+
+transform:translateY(0);
+
+}
+
+}

@@ -1,0 +1,326 @@
+/* ===========================================
+   FEATURE CARD
+=========================================== */
+
+.feature-card{
+
+    background: rgba(255,255,255,0.06);
+
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+
+    border: 1px solid rgba(255,255,255,0.15);
+
+    border-radius: 24px;
+
+    padding: 30px;
+
+    min-height: 220px;
+
+    transition: all .35s ease;
+
+    overflow: hidden;
+
+    display:flex;
+
+    flex-direction:column;
+
+    justify-content:center;
+
+    align-items:center;
+
+    text-align:center;
+
+}
+
+.feature-card:hover{
+
+    transform:translateY(-10px);
+
+    border:1px solid #00CFFF;
+
+    box-shadow:
+        0 0 20px rgba(0,207,255,.35),
+        0 0 45px rgba(255,46,99,.20);
+
+}
+
+/* ===========================================
+   FEATURE CARD ICON
+=========================================== */
+
+.feature-card h1{
+
+    font-size:52px;
+
+    margin-bottom:15px;
+
+}
+
+/* ===========================================
+   FEATURE CARD TITLE
+=========================================== */
+
+.feature-card h2{
+
+    font-family:'Rajdhani',sans-serif;
+
+    font-size:30px;
+
+    color:white;
+
+    margin-bottom:12px;
+
+}
+
+/* ===========================================
+   FEATURE CARD DESCRIPTION
+=========================================== */
+
+.feature-card p{
+
+    font-family:'Poppins',sans-serif;
+
+    color:#C9D1D9;
+
+    font-size:17px;
+
+    line-height:1.7;
+
+    margin:0;
+
+}
+
+/* ===========================================
+   STATS CARD
+=========================================== */
+
+.stats-card{
+
+    background:rgba(255,255,255,.05);
+
+    backdrop-filter:blur(18px);
+
+    border-radius:20px;
+
+    padding:25px;
+
+    text-align:center;
+
+    border:1px solid rgba(255,255,255,.12);
+
+    transition:.35s;
+
+}
+
+.stats-card:hover{
+
+    transform:translateY(-8px);
+
+    border-color:#00CFFF;
+
+    box-shadow:0 0 25px rgba(0,207,255,.35);
+
+}
+
+.stats-icon{
+
+    font-size:34px;
+
+}
+
+.stats-value{
+
+    font-size:42px;
+
+    font-weight:bold;
+
+    color:#00CFFF;
+
+    margin-top:10px;
+
+}
+
+.stats-title{
+
+    margin-top:8px;
+
+    color:#C9D1D9;
+
+    font-size:17px;
+
+}
+
+/* ===========================================
+   VIDEO CARD
+=========================================== */
+
+.video-card{
+
+    background:rgba(255,255,255,.06);
+
+    backdrop-filter:blur(20px);
+    -webkit-backdrop-filter:blur(20px);
+
+    border:1px solid rgba(255,255,255,.15);
+
+    border-radius:24px;
+
+    padding:20px;
+
+    transition:.35s;
+
+    margin-bottom:25px;
+
+}
+
+.video-card:hover{
+
+    transform:translateY(-8px);
+
+    border-color:#00CFFF;
+
+    box-shadow:
+        0 0 20px rgba(0,207,255,.30),
+        0 0 45px rgba(255,46,99,.18);
+
+}
+
+/* ===========================================
+   SECTION TITLE
+=========================================== */
+
+.section-title{
+
+    font-family:'Orbitron',sans-serif;
+
+    font-size:34px;
+
+    color:white;
+
+    text-shadow:
+        0 0 10px #00CFFF,
+        0 0 25px #00CFFF,
+        0 0 50px #00CFFF;
+
+    margin-bottom:20px;
+
+}
+
+/* ===========================================
+   SUMMARY CARD
+=========================================== */
+
+.summary-card{
+
+    background:rgba(255,255,255,.05);
+
+    backdrop-filter:blur(18px);
+
+    border-radius:20px;
+
+    padding:25px;
+
+    border:1px solid rgba(255,255,255,.12);
+
+    transition:.35s;
+
+    margin-bottom:20px;
+
+}
+
+.summary-card:hover{
+
+    transform:translateY(-6px);
+
+    border-color:#00CFFF;
+
+    box-shadow:0 0 25px rgba(0,207,255,.25);
+
+}
+
+.summary-title{
+
+    color:#00CFFF;
+
+    font-size:22px;
+
+    font-weight:bold;
+
+    margin-bottom:12px;
+
+    font-family:'Rajdhani',sans-serif;
+
+}
+
+.summary-text{
+
+    color:white;
+
+    line-height:1.8;
+
+    font-size:17px;
+
+}
+
+/* ===========================================
+   PROFILE CARD
+=========================================== */
+
+.profile-card{
+
+    background:rgba(255,255,255,.06);
+
+    backdrop-filter:blur(20px);
+
+    border-radius:24px;
+
+    border:1px solid rgba(255,255,255,.12);
+
+    padding:30px;
+
+    text-align:center;
+
+    transition:.35s;
+
+}
+
+.profile-card:hover{
+
+    border-color:#00CFFF;
+
+    transform:translateY(-8px);
+
+    box-shadow:0 0 25px rgba(0,207,255,.30);
+
+}
+
+/* ===========================================
+   ACHIEVEMENT CARD
+=========================================== */
+
+.achievement-card{
+
+    background:rgba(255,255,255,.05);
+
+    backdrop-filter:blur(18px);
+
+    border-radius:20px;
+
+    padding:25px;
+
+    border-left:6px solid #00CFFF;
+
+    margin-bottom:18px;
+
+    transition:.35s;
+
+}
+
+.achievement-card:hover{
+
+    transform:translateX(6px);
+
+    box-shadow:0 0 20px rgba(0,207,255,.25);
+
+}

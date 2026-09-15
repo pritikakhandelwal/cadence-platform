@@ -1,0 +1,43 @@
+# --- Python ---
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+.venv-*/
+*.egg-info/
+
+# --- Node / Next.js ---
+node_modules/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+
+# --- Env / secrets ---
+.env
+.env.*
+!.env.example
+
+# --- Media & generated artifacts (never commit these) ---
+*.mp4
+*.mov
+*.avi
+*.npy
+*.task
+*.db
+*.sqlite3
+runtime/
+output/
+extracted_keypoints/
+sample_data/
+legacy/cadence-streamlit/data/
+legacy/cadence-streamlit/database/
+legacy/cadence-streamlit/output/
+legacy/cadence-streamlit/runtime/
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

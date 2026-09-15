@@ -1,0 +1,298 @@
+/* ==========================================================
+   HERO TITLE
+========================================================== */
+
+h1{
+
+    text-align:center !important;
+
+    font-family:'Orbitron',sans-serif !important;
+
+    font-size:72px !important;
+
+    color:#FFFFFF !important;
+
+    letter-spacing:4px;
+
+    text-shadow:
+        0 0 8px #00CFFF,
+        0 0 18px #00CFFF,
+        0 0 35px #00CFFF,
+        0 0 60px #00CFFF;
+
+    animation:cadenceGlow 2s ease-in-out infinite alternate;
+
+}
+
+/* ==========================================================
+   HERO SUBTITLE
+========================================================== */
+
+h3{
+
+    text-align:center !important;
+
+    color:#00CFFF !important;
+
+    font-family:'Rajdhani',sans-serif !important;
+
+    font-size:30px !important;
+
+}
+
+/* ==========================================================
+   AUTHOR
+========================================================== */
+
+h5{
+
+    text-align:center !important;
+
+    color:#BFC9D4 !important;
+
+    font-family:'Poppins',sans-serif !important;
+
+}
+
+/* ==========================================================
+   TAGLINE
+========================================================== */
+
+.home-tagline{
+
+    text-align:center;
+
+    font-size:22px;
+
+    color:#E2E8F0;
+
+    font-style:italic;
+
+    margin-top:-12px;
+
+    margin-bottom:35px;
+
+    letter-spacing:.6px;
+
+}
+
+/* ==========================================================
+   WHY CHOOSE CADENCE
+========================================================== */
+
+.why-title{
+
+    text-align:center;
+
+    font-size:42px;
+
+    font-family:'Rajdhani',sans-serif;
+
+    font-weight:800;
+
+    color:#7DD3FC;
+
+    margin-bottom:40px;
+
+    text-shadow:
+        0 0 12px rgba(56,189,248,.45);
+
+}
+
+/* ==========================================================
+   FEATURE SECTION
+========================================================== */
+
+.home-feature{
+
+    display:flex;
+
+    flex-direction:column;
+
+    align-items:center;
+
+    justify-content:center;
+
+    text-align:center;
+
+    padding:28px 12px;
+
+    transition:.30s ease;
+
+}
+
+.home-feature:hover{
+
+    transform:translateY(-4px);
+
+}
+
+.feature-icon-circle{
+
+    width:74px;
+
+    height:74px;
+
+    border-radius:50%;
+
+    display:flex;
+
+    justify-content:center;
+
+    align-items:center;
+
+    margin-bottom:18px;
+
+    background:rgba(56,189,248,.10);
+
+    border:2px solid rgba(56,189,248,.35);
+
+    box-shadow:
+        0 0 18px rgba(56,189,248,.18);
+
+    transition:.30s;
+
+}
+
+.home-feature:hover .feature-icon-circle{
+
+    transform:scale(1.08);
+
+    border-color:#38BDF8;
+
+    box-shadow:
+        0 0 12px #38BDF8,
+        0 0 28px rgba(56,189,248,.40);
+
+}
+
+.material-symbols-rounded{
+
+    font-size:34px;
+
+    color:#38BDF8;
+
+    user-select:none;
+
+}
+
+.home-feature-content{
+
+    flex:1;
+
+}
+
+.home-feature-title{
+
+    font-size:28px;
+
+    font-family:'Rajdhani',sans-serif;
+
+    font-weight:700;
+
+    color:#F8FAFC;
+
+    margin-bottom:12px;
+
+}
+
+.home-feature-description{
+
+    max-width:720px;
+
+    margin:auto;
+
+    font-size:17px;
+
+    line-height:1.8;
+
+    color:#CBD5E1;
+
+    text-align:center;
+
+}
+
+.feature-divider{
+
+    width:70%;
+
+    height:1px;
+
+    margin:18px auto;
+
+    background:linear-gradient(
+
+        to right,
+
+        transparent,
+
+        rgba(56,189,248,.30),
+
+        transparent
+
+    );
+
+}
+
+/* ==========================================================
+   ABOUT
+========================================================== */
+
+.about-home-title{
+
+    text-align:center;
+
+    font-size:34px;
+
+    color:#38BDF8;
+
+    font-family:'Rajdhani',sans-serif;
+
+    font-weight:700;
+
+    margin-bottom:24px;
+
+}
+
+.about-home-text{
+
+    max-width:900px;
+
+    margin:auto;
+
+    text-align:center;
+
+    color:#E5E7EB;
+
+    font-size:18px;
+
+    line-height:2;
+
+}
+
+/* ==========================================================
+   GLOW
+========================================================== */
+
+@keyframes cadenceGlow{
+
+    from{
+
+        text-shadow:
+            0 0 8px #00CFFF,
+            0 0 18px #00CFFF,
+            0 0 35px #00CFFF;
+
+    }
+
+    to{
+
+        text-shadow:
+            0 0 15px #00CFFF,
+            0 0 30px #00CFFF,
+            0 0 55px #00CFFF,
+            0 0 80px #00CFFF;
+
+    }
+
+}

@@ -1,0 +1,5 @@
+arq>=0.26
+-e ../../packages/schema/python
+
+# dev
+pytest>=8.0
