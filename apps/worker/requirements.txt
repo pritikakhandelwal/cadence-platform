@@ -1,4 +1,9 @@
 arq>=0.26
+numpy>=1.26
+opencv-python-headless>=4.9
+ultralytics>=8.3      # YOLO person detection + ByteTrack/BoT-SORT tracking
+rtmlib>=0.0.13         # RTMPose via onnxruntime, no mmcv/mmdet/mmpose stack
+onnxruntime>=1.18
 -e ../../packages/schema/python
 
 # dev

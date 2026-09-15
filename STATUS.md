@@ -34,9 +34,23 @@ The legacy Streamlit modules were ported (not rewritten) onto FastAPI + SQLAlche
 
 **What's left of Phase 1:** wire `apps/web` to actually call these endpoints (currently a placeholder page with no API calls), and get a real Postgres run to confirm the dialect-agnostic models actually work there, not just on SQLite.
 
-## Phase 2 — Lock-on — **not started**
+## Phase 2 — Lock-on — **core pipeline built and verified against a real video; not wired to the API yet**
 
-Legacy app runs MediaPipe on the full frame (`modules/pose_detector.py`, `requirements.txt` pins `mediapipe==0.10.35`). No person detection, no tracking, no multi-person handling. This is the next real technical work after Phase 0/CI is green.
+`apps/worker/worker/pipeline/` (see that app's README for the module breakdown):
+
+- [x] YOLO person detection + ByteTrack/BoT-SORT tracking (`detection.py`, via `ultralytics .track()`)
+- [x] Pose-on-crop-only via RTMPose (`pose.py`, via `rtmlib`) — never runs on the full frame, so a second person or a mirror can't corrupt the signal
+- [x] Short-gap (≤3 frames) linear interpolation, longer gaps left as real discontinuities (`interpolation.py`)
+- [x] One-Euro jitter smoothing, per joint/axis (`smoothing.py`)
+- [x] Track summaries for a future multi-person "pick your dancer" UI, and a quality gate (reliable-frame %, fragmentation, person count) that rejects a bad lock with a human reason (`quality.py`)
+- [x] 20 fast unit tests (no ML deps needed) covering smoothing/interpolation/quality-gate logic in isolation — passing
+- [x] 2 integration tests that run the **real** pipeline against a real solo dance clip (`professional_dance.mp4`, not committed — see `apps/worker/README.md`) — both passing: detection finds the dancer, tracking holds them through the clip, pose comes back with plausible non-zero keypoints, the quality gate passes
+- [ ] **Performance is not acceptable yet.** The integration test run took ~48 minutes for a few seconds of video on CPU. The likely cause: `pose.py` uses `rtmlib`'s `Body`, which runs its *own* internal person detector on every cropped frame — on top of the YOLO detection we already did for tracking. That's two detectors running per frame instead of one. Fix before this goes near a real upload: either find `rtmlib`'s way to skip its internal detector and hand it a known bbox directly, or reconsider whether `Body` is the right entry point at all. Don't assume this is fixed until re-measured.
+- [ ] No eval dataset yet (roadmap's "film 30 clips yourself" for MOTA/IDF1, reliable-frame %, false-lock-on-mirror numbers) — only spot-checked on one solo clip so far, not the 20-clip battery the roadmap asks for
+- [ ] `apps/api` doesn't call any of this yet — `POST /analyses` still just creates a `queued` row (see that endpoint's comment). Wiring it in means either giving `apps/worker` its own DB access (duplicating `apps/api`'s models, or moving them to a shared package) or having the API poll/callback — not decided yet, don't guess at it, decide deliberately when picking this up
+- [ ] Multi-person "pick your dancer" UI doesn't exist (no frontend calls into any of this)
+
+**What's real here:** the pipeline actually runs, on actual footage, and produces a plausible pose sequence with a working accept/reject gate — this isn't stubbed. **What's not real yet:** it's not fast enough to ship, it's not connected to anything a user can trigger, and it hasn't been measured against more than one clip.
 
 ## Phase 3 — Coaching intelligence — **not started (legacy score is a placeholder)**
 
@@ -60,4 +74,4 @@ Scoped per [`docs/decisions.md`](docs/decisions.md): curated phrases + BPM/genre
 
 ## Next concrete step
 
-Start Phase 2 (lock-on): YOLO person detection → ByteTrack/BoT-SORT identity tracking → crop → RTMPose, replacing legacy's full-frame MediaPipe (`legacy/cadence-streamlit/modules/pose_detector.py`). This is the technical heart of the roadmap and the biggest single piece of remaining work before the score means anything. Wire the resulting job into `apps/worker`, writing back into the `Analysis.result` column added in Phase 1.
+Fix Phase 2's performance problem first (rtmlib's `Body` double-detects per frame — see above) and re-measure on more than one clip before touching anything else. Only after that: decide how `apps/worker` and `apps/api` share analysis state (shared DB models vs. callback), wire `POST /analyses` to actually enqueue `detect_tracks_job`, and build the multi-person pick UI. Phase 3 (real scoring) depends on Phase 2 output being trustworthy, so don't jump ahead of this.

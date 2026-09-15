@@ -33,3 +33,12 @@ Legacy app uses SQLite (fine for a single-process demo). Production target is Po
 ## MediaPipe → YOLO + tracker + RTMPose/ViTPose
 
 Legacy app runs MediaPipe on the full frame. This breaks on multi-person shots, mirrors, and occlusion — exactly the real-world conditions dance video has. Phase 2 replaces this with detect → track → crop → pose. MediaPipe stays only as a fallback for a future live-webcam v1 (Phase 8).
+
+## Tracker and pose libraries: integrate, don't reimplement
+
+**Decision:** use `ultralytics`'s built-in `.track()` (which already bundles YOLO detection with a ByteTrack/BoT-SORT tracker) instead of hand-rolling ByteTrack, and use `rtmlib` (RTMPose over onnxruntime) instead of installing the full OpenMMLab stack (`mmcv`/`mmdet`/`mmpose`).
+
+**Why:**
+- Reimplementing ByteTrack correctly (Kalman filter, cascade matching, track lifecycle) is a research-engineering project on its own — the roadmap already scopes Phase 2 as 6-8 weeks for a reason; spending that budget re-deriving a tracker that ships free with the detector would be the wrong 6-8 weeks.
+- The full `mmcv`/`mmdet`/`mmpose` stack is notoriously version-fragile (compiled CUDA ops, tight pinned versions across three packages). `rtmlib` runs the same RTMPose ONNX-exported weights through plain `onnxruntime`, with no compiled-extension version matrix to fight — the practical choice for a small team, not a compromise on the model itself.
+- Both choices are swappable later: if RTMW (whole-body, for Indian classical hand detail) or a different tracker outperforms these on the eventual 30-clip eval set, `pipeline/pose.py` and `pipeline/detection.py` are the only two files that would need to change — `pipeline.py`'s orchestration and everything downstream (Phase 3 scoring) doesn't care which library produced the keypoints.

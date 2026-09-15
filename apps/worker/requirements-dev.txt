@@ -1,0 +1,11 @@
+# Lightweight deps for the default `pytest` run (pure-logic tests only:
+# smoothing, quality, interpolation). CI installs this, not
+# requirements.txt, so it doesn't pull torch/ultralytics/rtmlib/onnxruntime
+# (several hundred MB, several minutes) just to test math.
+#
+# To run the real pipeline (or `pytest -m integration`), install
+# requirements.txt instead -- it's a superset of this file.
+arq>=0.26
+numpy>=1.26
+pytest>=8.0
+-e ../../packages/schema/python

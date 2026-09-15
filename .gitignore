@@ -27,6 +27,11 @@ out/
 *.task
 *.db
 *.sqlite3
+
+# --- Downloaded ML model weights (auto-fetched on first run) ---
+*.pt
+*.onnx
+*.pth
 runtime/
 output/
 extracted_keypoints/
