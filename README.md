@@ -22,15 +22,19 @@ docs/
 Every app has its own README with setup/run/test instructions:
 [`apps/web`](apps/web/README.md) · [`apps/api`](apps/api/README.md) · [`apps/worker`](apps/worker/README.md) · [`packages/schema`](packages/schema/README.md) · [`legacy/cadence-streamlit`](legacy/cadence-streamlit/README.md)
 
-## Quick start (Phase 0 — everything here is a placeholder proving the skeleton works)
+## Quick start
 
 ```bash
+# optional: Postgres + Redis for something closer to production
+docker compose up postgres redis
+cp .env.example .env   # then set DATABASE_URL / REDIS_URL if using the above
+
 # web
 cd apps/web && npm install && npm run dev        # http://localhost:3000
 
-# api (separate terminal)
+# api (separate terminal) — auth + validated uploads + persisted analyses
 cd apps/api && python -m venv .venv && .venv\Scripts\activate && pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000        # GET /health
+uvicorn app.main:app --reload --port 8000        # GET /health; without DATABASE_URL, falls back to local SQLite
 
 # worker (separate terminal, needs Redis running)
 cd apps/worker && python -m venv .venv && .venv\Scripts\activate && pip install -r requirements.txt
@@ -42,11 +46,13 @@ pip install -r requirements-utf8.txt
 streamlit run app.py
 ```
 
-FFmpeg must be on `PATH` for both the legacy app and (later) `apps/api` video validation.
+FFmpeg (`ffprobe`) must be on `PATH` for both the legacy app and `apps/api` video validation/tests.
+
+`apps/api` now has real endpoints — `POST /auth/register`, `POST /auth/login`, `GET /auth/me`, `POST /analyses` (upload + validate two MP4s), `GET /analyses/{id}`. See [`apps/api/README.md`](apps/api/README.md) for the full list. `apps/web` doesn't call any of this yet — it's still the Phase 0 placeholder page.
 
 ## Where things actually stand
 
-Don't assume a phase in `ROADMAP.md` is unstarted just because it's early in the list — the legacy app already has working auth (Argon2id + lockout), upload validation (magic bytes + ffprobe), and per-analysis workspace isolation. Read [`STATUS.md`](STATUS.md) before starting work on any phase; it tracks what's actually done vs. planned, since the two drift.
+Phases 0 and 1 are done: `apps/api` has real accounts (Argon2id + lockout), validated video uploads (magic bytes + ffprobe), UUID-isolated workspaces, and persisted analysis rows — ported from the legacy app rather than rewritten. Phase 2 (YOLO + tracking lock-on, replacing legacy's full-frame MediaPipe) is next and hasn't started. Read [`STATUS.md`](STATUS.md) before starting work on any phase; it tracks what's actually done vs. planned, since the two drift.
 
 ## Contributing to this repo
 
