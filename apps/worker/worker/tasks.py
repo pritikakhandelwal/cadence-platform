@@ -58,6 +58,15 @@ async def detect_tracks_job(ctx: dict[str, Any], analysis_id: str, video_path: s
                 "detections": [asdict(d) for d in detections],
                 "fps": summary.fps,
                 "total_frames": summary.total_frames,
+                "tracks": [
+                    {
+                        "track_id": t.track_id,
+                        "frame_count": t.frame_count,
+                        "mean_confidence": t.mean_confidence,
+                        "fragments": t.fragments,
+                    }
+                    for t in summary.tracks
+                ],
             }
         else:
             track_id = summary.tracks[0].track_id
@@ -97,47 +106,58 @@ def _finish(analysis, status, tracking, quality_gate) -> None:
 
 async def extract_locked_pose_job(
     ctx: dict[str, Any],
+    analysis_id: str,
     video_path: str,
     track_id: int,
     fps: float,
     total_frames: int,
     detections: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    """Lock onto one track from a prior detect_tracks_job call (its
-    Analysis.pending_lock_data) and extract its smoothed, quality-
-    scored pose sequence. Not yet called from anywhere -- this is what
-    a future POST /analyses/{id}/lock endpoint would enqueue once a
-    user has picked a track_id from a needs_dancer_pick analysis; that
-    endpoint doesn't exist yet. Kept separate from detect_tracks_job's
-    own auto-lock path so both can call the same underlying pipeline
-    function without duplicating it.
+    """Resume a needs_dancer_pick analysis once a user has picked a
+    track_id, using the detections detect_tracks_job stashed in
+    Analysis.pending_lock_data so this doesn't have to re-run YOLO.
+    Enqueued by POST /analyses/{id}/lock. Writes a final
+    complete/rejected AnalysisResult into the same row, same as
+    detect_tracks_job's own auto-lock path -- kept as a separate job
+    (rather than folded into detect_tracks_job) so re-locking doesn't
+    require re-running detection.
     """
+
+    from cadence_db import Analysis, SessionLocal
+    from cadence_schema import AnalysisStatus, QualityGate, TrackingInfo
 
     from .pipeline.pipeline import extract_locked_pose
     from .pipeline.quality import Detection
 
-    detection_objs = [
-        Detection(
-            frame_idx=d["frame_idx"], track_id=d["track_id"], bbox=tuple(d["bbox"]), confidence=d["confidence"]
+    db = SessionLocal()
+    try:
+        analysis = db.get(Analysis, analysis_id)
+        if analysis is None:
+            return {"error": "analysis_not_found", "analysis_id": analysis_id}
+
+        detection_objs = [
+            Detection(
+                frame_idx=d["frame_idx"], track_id=d["track_id"], bbox=tuple(d["bbox"]), confidence=d["confidence"]
+            )
+            for d in detections
+        ]
+
+        locked = extract_locked_pose(video_path, detection_objs, track_id, fps, total_frames)
+        status = AnalysisStatus.complete if locked.quality_gate.passed else AnalysisStatus.rejected
+        _finish(
+            analysis,
+            status,
+            TrackingInfo(
+                confidence=locked.quality.mean_confidence,
+                reliable_frame_pct=locked.quality.reliable_frame_pct,
+                person_count=locked.quality.person_count,
+                lock_id=str(track_id),
+            ),
+            QualityGate(passed=locked.quality_gate.passed, reasons=locked.quality_gate.reasons),
         )
-        for d in detections
-    ]
-
-    result = extract_locked_pose(video_path, detection_objs, track_id, fps, total_frames)
-
-    return {
-        "track_id": result.track_id,
-        "fps": result.fps,
-        "frame_indices": result.frame_indices,
-        "keypoints": [k.tolist() for k in result.keypoints],
-        "tracking": {
-            "confidence": result.quality.mean_confidence,
-            "reliable_frame_pct": result.quality.reliable_frame_pct,
-            "person_count": result.quality.person_count,
-            "lock_id": str(result.track_id),
-        },
-        "quality_gate": {
-            "passed": result.quality_gate.passed,
-            "reasons": result.quality_gate.reasons,
-        },
-    }
+        analysis.pending_lock_data = None
+        analysis.updated_at = datetime.now(timezone.utc)
+        db.commit()
+        return {"analysis_id": analysis_id, "status": analysis.status}
+    finally:
+        db.close()

@@ -15,7 +15,7 @@ Without a `DATABASE_URL` env var it falls back to a local SQLite file (`cadence.
 
 FFmpeg (`ffprobe`) must be on `PATH` — video upload validation shells out to it.
 
-## Endpoints (Phase 1)
+## Endpoints
 
 | Method | Path | Auth | Notes |
 |---|---|---|---|
@@ -24,8 +24,12 @@ FFmpeg (`ffprobe`) must be on `PATH` — video upload validation shells out to i
 | POST | `/auth/login` | — | Argon2id verify, 5-attempt lockout, rate-limited (10/5min/IP), sets `cadence_session` httpOnly cookie |
 | POST | `/auth/logout` | cookie | |
 | GET | `/auth/me` | cookie | |
-| POST | `/analyses` | cookie | multipart `professional_video` + `user_video` (MP4, ≤250MB, ≤5min); validates magic bytes + `ffprobe`, creates a UUID-isolated workspace, persists a `queued` row |
-| GET | `/analyses/{id}` | cookie | returns an `AnalysisResult` (packages/schema); `queued` until Phase 2/3 fill in real tracking/scoring |
+| POST | `/analyses` | cookie | multipart `professional_video` + `user_video` (MP4, ≤250MB, ≤5min); validates magic bytes + `ffprobe`, creates a UUID-isolated workspace, persists a `queued` row, enqueues `apps/worker`'s `detect_tracks_job` |
+| GET | `/analyses/{id}` | cookie | returns an `AnalysisResult` (packages/schema) built from the row; if `needs_dancer_pick`, points at the two endpoints below |
+| GET | `/analyses/{id}/candidate-tracks` | cookie | only valid while `status == needs_dancer_pick`; lists the tracks a "pick your dancer" UI would show (track_id, frame_count, mean_confidence, fragments) |
+| POST | `/analyses/{id}/lock` | cookie | body `{"track_id": int}`; only valid while `needs_dancer_pick`; enqueues `extract_locked_pose_job` to resume from the stashed detections (no re-running YOLO), marks the row `running` |
+
+`needs_dancer_pick` happens when `apps/worker`'s `is_lock_ambiguous` can't confidently pick a single dominant track (two real people, or a mirror reflection producing a spurious second track — see `apps/worker/README.md`). There's no frontend calling any of this yet; these three endpoints together are the whole multi-person flow so far.
 
 ## Test
 
@@ -45,10 +49,12 @@ python scripts/cleanup_workspaces.py --max-age-hours 24
 
 ## What's ported from the legacy app vs. new
 
-Ported near-verbatim (already matched the roadmap's Phase 1 intent): `app/security/auth.py`, `app/security/input_validation.py`, `app/security/video_validation.py` (adapted from Streamlit's sync `UploadedFile` to FastAPI's async `UploadFile`), `app/workspace.py` (+ added `cleanup_abandoned_workspaces`).
+Ported near-verbatim (already matched the roadmap's Phase 1 intent): `app/security/auth.py`, `app/security/input_validation.py`, `app/security/video_validation.py` (adapted from Streamlit's sync `UploadedFile` to FastAPI's async `UploadFile`).
 
-New in this app: `app/db.py` / `app/models.py` (SQLAlchemy, Postgres in prod / SQLite in tests — the legacy app used raw sqlite3), the FastAPI routers, cookie-based sessions (the legacy app used Streamlit session state), and `app/rate_limit.py` (the legacy app only rate-limited login attempts per-account; this adds a basic per-IP limiter — a real one, but process-local; move to Redis-backed in Phase 7 once there are multiple API processes).
+New in this app: cookie-based sessions (the legacy app used Streamlit session state), `app/rate_limit.py` (the legacy app only rate-limited login attempts per-account; this adds a basic per-IP limiter — a real one, but process-local; move to Redis-backed in Phase 7 once there are multiple API processes), and `app/queue.py` (enqueues jobs onto `apps/worker` via arq, Phase 2).
+
+The DB models (`User`, `LoginSecurity`, `UserSession`, `Analysis`) and the per-analysis file workspace live in [`packages/db`](../../packages/db) and [`packages/workspace`](../../packages/workspace) respectively, not in this app — they moved out in Phase 2 once `apps/worker` needed to read/write the same rows and files. See [`../../docs/decisions.md`](../../docs/decisions.md).
 
 ## Roadmap
 
-Phase 1 (this app) is mostly here: isolated uploads, validated video, real accounts, persisted analysis rows. Not yet done: Postgres migrations via Alembic (currently `Base.metadata.create_all`, fine until the schema needs to change without dropping data). Phase 2 adds the actual detect→track→pose job dispatched to `apps/worker`. See [`../../STATUS.md`](../../STATUS.md).
+Phase 1 (isolated uploads, validated video, real accounts, persisted rows) and Phase 2's API surface (enqueue detection, multi-person pick flow) are both here. Not yet done: Postgres migrations via Alembic (currently `Base.metadata.create_all`, fine until the schema needs to change without dropping data), and nothing in `apps/web` calls any of this yet. See [`../../STATUS.md`](../../STATUS.md).
