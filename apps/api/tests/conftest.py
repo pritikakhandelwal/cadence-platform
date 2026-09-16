@@ -75,6 +75,30 @@ def client(db_session, fake_queue, tmp_path, monkeypatch):
         yield test_client
 
 
+@pytest.fixture(autouse=True)
+def _no_real_youtube_downloads(monkeypatch):
+    """Safety net: makes any test that reaches the real YouTube
+    downloader fail loudly and fast instead of silently making a real
+    network call. Added after a test-logic bug (not a bug in the
+    endpoint itself) let a request that should have been rejected
+    reach download_youtube_video for real -- it downloaded an actual
+    229MB video from a real youtube.com URL during a supposedly
+    offline test run. Tests that want the success path (or a specific
+    failure) still explicitly monkeypatch this again inside the test
+    body, which simply overrides this default within that test."""
+
+    import app.routers.analyses as analyses_module
+
+    def _fail(url: str, destination) -> None:
+        raise AssertionError(
+            "A test reached the real download_youtube_video without mocking it -- "
+            "this would have made a real network call to YouTube. Monkeypatch "
+            "app.routers.analyses.download_youtube_video in this test."
+        )
+
+    monkeypatch.setattr(analyses_module, "download_youtube_video", _fail)
+
+
 @pytest.fixture(scope="session")
 def tiny_mp4_bytes(tmp_path_factory) -> bytes:
     """A ~1-second, tiny, valid MP4 generated with ffmpeg -- avoids

@@ -110,6 +110,73 @@ def test_upload_rejects_invalid_video(client):
     assert response.status_code == 400
 
 
+def test_create_analysis_rejects_both_file_and_url(client, tiny_mp4_bytes):
+    _register_and_login(client)
+
+    response = client.post(
+        "/analyses",
+        files={
+            "user_video": ("user.mp4", tiny_mp4_bytes, "video/mp4"),
+            "professional_video": ("pro.mp4", tiny_mp4_bytes, "video/mp4"),
+        },
+        data={"professional_video_url": "https://youtu.be/fake-test-id"},
+    )
+    assert response.status_code == 400
+    assert "exactly one" in response.json()["detail"]
+
+
+def test_create_analysis_rejects_neither_file_nor_url(client, tiny_mp4_bytes):
+    _register_and_login(client)
+
+    response = client.post(
+        "/analyses",
+        files={"user_video": ("user.mp4", tiny_mp4_bytes, "video/mp4")},
+    )
+    assert response.status_code == 400
+    assert "exactly one" in response.json()["detail"]
+
+
+def test_create_analysis_accepts_a_youtube_url_for_the_reference_video(
+    client, tiny_mp4_bytes, monkeypatch
+):
+    import app.routers.analyses as analyses_module
+
+    def _fake_download(url: str, destination) -> None:
+        assert url == "https://youtu.be/fake-test-id"
+        with open(destination, "wb") as f:
+            f.write(tiny_mp4_bytes)
+
+    monkeypatch.setattr(analyses_module, "download_youtube_video", _fake_download)
+
+    _register_and_login(client)
+    response = client.post(
+        "/analyses",
+        files={"user_video": ("user.mp4", tiny_mp4_bytes, "video/mp4")},
+        data={"professional_video_url": "https://youtu.be/fake-test-id"},
+    )
+    assert response.status_code == 201
+    assert response.json()["status"] == "queued"
+
+
+def test_create_analysis_surfaces_youtube_download_errors_as_400(client, tiny_mp4_bytes, monkeypatch):
+    import app.routers.analyses as analyses_module
+    from app.security.youtube import YouTubeDownloadError
+
+    def _fake_download(url: str, destination) -> None:
+        raise YouTubeDownloadError("Only youtube.com / youtu.be links are supported.")
+
+    monkeypatch.setattr(analyses_module, "download_youtube_video", _fake_download)
+
+    _register_and_login(client)
+    response = client.post(
+        "/analyses",
+        files={"user_video": ("user.mp4", tiny_mp4_bytes, "video/mp4")},
+        data={"professional_video_url": "https://example.com/not-youtube"},
+    )
+    assert response.status_code == 400
+    assert "youtube" in response.json()["detail"].lower()
+
+
 def test_cannot_read_another_users_analysis(client, tiny_mp4_bytes):
     _register_and_login(client, email="ada@example.com")
     create_response = client.post(

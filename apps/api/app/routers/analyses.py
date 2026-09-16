@@ -3,7 +3,7 @@ from __future__ import annotations
 from cadence_db import Analysis, User, get_db
 from cadence_schema import AnalysisResult, AnalysisStatus, QualityGate, TrackingInfo
 from cadence_workspace import create_analysis_workspace, remove_analysis_workspace, workspace_for
-from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -14,6 +14,7 @@ from ..security.video_validation import (
     validate_saved_video,
     validate_uploaded_video,
 )
+from ..security.youtube import YouTubeDownloadError, download_youtube_video
 
 router = APIRouter(prefix="/analyses", tags=["analyses"])
 
@@ -31,24 +32,53 @@ def _get_owned_analysis(db: Session, analysis_id: str, user: User) -> Analysis:
     return analysis
 
 
+def _has_file(upload: UploadFile | None) -> bool:
+    return upload is not None and bool(upload.filename)
+
+
 @router.post("", status_code=201)
 async def create_analysis(
-    professional_video: UploadFile,
     user_video: UploadFile,
+    professional_video: UploadFile | None = File(None),
+    professional_video_url: str | None = Form(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
     queue: JobQueue = Depends(get_queue),
 ) -> dict[str, str]:
-    for upload in (professional_video, user_video):
-        try:
-            await validate_uploaded_video(upload)
-        except VideoValidationError as error:
-            raise HTTPException(status_code=400, detail=str(error)) from error
+    has_file = _has_file(professional_video)
+    has_url = bool(professional_video_url and professional_video_url.strip())
+    if has_file == has_url:  # both provided, or neither
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Provide exactly one of professional_video (a file) or "
+                "professional_video_url (a YouTube link)."
+            ),
+        )
+
+    try:
+        await validate_uploaded_video(user_video)
+        if has_file:
+            await validate_uploaded_video(professional_video)
+    except VideoValidationError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
 
     workspace = create_analysis_workspace()
     try:
-        await _save_upload(professional_video, workspace.professional_upload)
         await _save_upload(user_video, workspace.user_upload)
+
+        if has_file:
+            await _save_upload(professional_video, workspace.professional_upload)
+        else:
+            # No upload-stream magic-byte check here (there's no upload
+            # stream) -- yt-dlp only ever fetches real YouTube content
+            # in the format we ask for, and validate_saved_video below
+            # (ffprobe) is what actually confirms it's a short, decodable
+            # video, same as the upload path.
+            try:
+                download_youtube_video(professional_video_url, workspace.professional_upload)
+            except YouTubeDownloadError as error:
+                raise HTTPException(status_code=400, detail=str(error)) from error
 
         for path in (workspace.professional_upload, workspace.user_upload):
             try:

@@ -15,6 +15,17 @@ Short record of decisions that shape the roadmap, so nobody re-litigates them mi
 
 This lives in Phase 5 + Phase 6 of [`ROADMAP.md`](../ROADMAP.md).
 
+## YouTube link for the professional reference video → build it, scoped narrow
+
+**Ask:** "integrate an option of putting a YouTube link for the professional dance section" (instead of only uploading a file).
+
+**Decision:** `POST /analyses` accepts `professional_video_url` as an alternative to `professional_video` (exactly one of the two, not both, not neither). Server downloads it with `yt-dlp`, then runs it through the *same* validation (`ffprobe` duration/codec checks) as an uploaded file. Restricted strictly to `youtube.com`/`youtu.be` hosts over `http`/`https` — never an arbitrary URL.
+
+**Why the restriction, specifically:**
+- Downloading and storing third-party YouTube content server-side to compare against a user's own dance is a real copyright/ToS gray area — YouTube's ToS generally restricts downloading outside their own offline feature. Built anyway, since many "practice against a reference" apps operate in this same space for personal, non-redistributed use, but this is a real exposure, not a solved one — worth knowing if this ever needs a legal review before wider release.
+- A generic "fetch this URL" endpoint on a server is a classic SSRF vector — it can be used to probe internal network addresses, cloud metadata endpoints, or `file://` paths. Restricting to a fixed host allowlist *and* to `http`/`https` schemes closes that off. (A test that used a real `youtube.com` URL without mocking the downloader caught a real gap here during development: the host check alone passed `ftp://youtube.com/...`, since `urlparse` extracts a hostname regardless of scheme — the scheme check was missing. Fixed, and a test-suite safety net now makes any test that reaches the real downloader unmocked fail loudly instead of silently downloading real content, after exactly that happened once — see `apps/api/tests/conftest.py`.)
+- Reusing `validate_saved_video` (the same `ffprobe` check an uploaded file goes through) rather than trusting `yt-dlp`'s metadata means a YouTube link can't bypass the platform's normal duration/codec/size expectations just by arriving a different way.
+
 ## Dance-form auto-detection → confirmable suggestion, gated on lock-on
 
 **Ask:** "detect the dance form automatically."

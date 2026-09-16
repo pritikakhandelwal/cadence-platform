@@ -24,12 +24,18 @@ FFmpeg (`ffprobe`) must be on `PATH` — video upload validation shells out to i
 | POST | `/auth/login` | — | Argon2id verify, 5-attempt lockout, rate-limited (10/5min/IP), sets `cadence_session` httpOnly cookie |
 | POST | `/auth/logout` | cookie | |
 | GET | `/auth/me` | cookie | |
-| POST | `/analyses` | cookie | multipart `professional_video` + `user_video` (MP4, ≤250MB, ≤5min); validates magic bytes + `ffprobe`, creates a UUID-isolated workspace, persists a `queued` row, enqueues `apps/worker`'s `detect_tracks_job` |
+| POST | `/analyses` | cookie | multipart `user_video` (required) + exactly one of `professional_video` (file) or `professional_video_url` (a YouTube link — see below); validates magic bytes + `ffprobe`, creates a UUID-isolated workspace, persists a `queued` row, enqueues `apps/worker`'s `detect_tracks_job` |
 | GET | `/analyses/{id}` | cookie | returns an `AnalysisResult` (packages/schema) built from the row; if `needs_dancer_pick`, points at the two endpoints below |
 | GET | `/analyses/{id}/candidate-tracks` | cookie | only valid while `status == needs_dancer_pick`; lists the tracks a "pick your dancer" UI would show (track_id, frame_count, mean_confidence, fragments) |
 | POST | `/analyses/{id}/lock` | cookie | body `{"track_id": int}`; only valid while `needs_dancer_pick`; enqueues `extract_locked_pose_job` to resume from the stashed detections (no re-running YOLO), marks the row `running` |
 
 `needs_dancer_pick` happens when `apps/worker`'s `is_lock_ambiguous` can't confidently pick a single dominant track (two real people, or a mirror reflection producing a spurious second track — see `apps/worker/README.md`). There's no frontend calling any of this yet; these three endpoints together are the whole multi-person flow so far.
+
+### `professional_video_url` (YouTube reference)
+
+`app/security/youtube.py` downloads it with `yt-dlp`, restricted to `youtube.com`/`youtu.be` hosts over `http`/`https` only — never an arbitrary URL (that would be a server-side-request-forgery vector). The downloaded file goes through the same `ffprobe` validation an uploaded file does. This sits in a real copyright/ToS gray area (downloading YouTube content server-side) — see [`../../docs/decisions.md`](../../docs/decisions.md) for why it was built anyway and scoped this narrow.
+
+Tests never make a real network call: `tests/conftest.py` has an autouse fixture that makes the real `download_youtube_video` raise if any test reaches it unmocked, added after exactly that happened once during development (a test-logic bug, not an endpoint bug, let a request through that downloaded a real 229MB video mid-test-run). Tests that want the download path mock it explicitly via `monkeypatch.setattr(analyses_module, "download_youtube_video", ...)`.
 
 ## Test
 
