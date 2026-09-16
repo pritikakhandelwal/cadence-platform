@@ -222,9 +222,11 @@ def test_low_confidence_joint_does_not_produce_a_spurious_issue():
     were actually just RTMPose guessing at off-screen joints, not real
     technique differences. This is the regression test for the fix
     (features.joint_angles' confidence masking) -- a joint that's
-    consistently low-confidence in the user clip shouldn't surface an
-    issue even if its raw geometric angle differs a lot from the
-    reference."""
+    consistently low-confidence in the user clip shouldn't surface as
+    an ANGLE issue even if its raw geometric angle differs a lot from
+    the reference. It should instead surface as an OCCLUSION issue --
+    that's the whole point of adding that type: turn silent masking
+    into a visible, honest signal instead of just hiding the joint."""
 
     num_frames = 40
     reference = _animated_sequence(num_frames)
@@ -251,5 +253,181 @@ def test_low_confidence_joint_does_not_produce_a_spurious_issue():
         user_scores=user_scores,
     )
 
-    flagged_joints = {issue.joint for segment in result.segments for issue in segment.issues}
-    assert "right_knee" not in flagged_joints
+    issues_by_joint_and_type = {
+        (issue.joint, issue.type) for segment in result.segments for issue in segment.issues
+    }
+    assert ("right_knee", "angle") not in issues_by_joint_and_type
+    assert ("right_knee", "occlusion") in issues_by_joint_and_type
+
+
+def _animated_sequence_with_lean(num_frames: int, extra_lean_scale: float = 0.0, extra_lean_seed: int = 20) -> list[np.ndarray]:
+    """Like _animated_sequence, plus a horizontal shoulder shift (torso
+    lean) that varies over time -- a constant shift would be invisible
+    after spine_lean's per-video baseline correction (by design: it's
+    meant to ignore a fixed camera angle), so this has to actually
+    change over time to be a genuine planted difference."""
+
+    elbow_signal = _smoothed_random_walk(num_frames, scale=8.0, offset=135.0, seed=1)
+    knee_signal = _smoothed_random_walk(num_frames, scale=6.0, offset=150.0, seed=2)
+    hip_signal = _smoothed_random_walk(num_frames, scale=5.0, offset=130.0, seed=3)
+    base_lean = _smoothed_random_walk(num_frames, scale=4.0, offset=0.0, seed=15)
+    extra_lean = (
+        _smoothed_random_walk(num_frames, scale=extra_lean_scale, offset=0.0, seed=extra_lean_seed)
+        if extra_lean_scale
+        else np.zeros(num_frames)
+    )
+
+    frames = []
+    for t in range(num_frames):
+        kp = _base_pose()
+        shift = base_lean[t] + extra_lean[t]
+        # shift shoulders *before* the angle triples that use them as a
+        # vertex reference, so the elbow/hip angles land where intended
+        # relative to the shifted shoulder, not the original one
+        kp[L_SHOULDER] = kp[L_SHOULDER] + np.array([shift, 0.0])
+        kp[R_SHOULDER] = kp[R_SHOULDER] + np.array([shift, 0.0])
+        _set_angle(kp, L_SHOULDER, L_ELBOW, L_WRIST, elbow_signal[t])
+        _set_angle(kp, R_HIP, R_KNEE, R_ANKLE, knee_signal[t])
+        _set_angle(kp, L_SHOULDER, L_HIP, L_KNEE, hip_signal[t])
+        frames.append(kp)
+    return frames
+
+
+def test_torso_lean_issue_fires_when_it_genuinely_differs_over_time():
+    """spine_lean used to be unconditionally excluded from issues. Now
+    that it isn't, this checks it actually fires -- and, implicitly,
+    that a *constant* lean offset (the reference's own base_lean walk,
+    shared with the user) correctly does NOT fire on its own, since
+    only the user's *extra* time-varying lean should show up as a
+    genuine difference after baseline correction."""
+
+    num_frames = 40
+    reference = _animated_sequence_with_lean(num_frames, extra_lean_scale=0.0)
+    bad_user = _animated_sequence_with_lean(num_frames, extra_lean_scale=6.0)
+    frame_indices = list(range(num_frames))
+
+    result = score_analysis(reference, frame_indices, 30.0, bad_user, frame_indices, 30.0)
+
+    flagged = {(issue.joint, issue.type) for s in result.segments for issue in s.issues}
+    assert ("spine_lean", "angle") in flagged
+
+
+def _animated_sequence_with_wobble(num_frames: int, extra_wobble_scale: float = 0.0, extra_wobble_seed: int = 40) -> list[np.ndarray]:
+    """Like _animated_sequence, plus an extra horizontal drift on the
+    left ankle -- shifts the hip-to-ankle (balance_offset) relationship
+    over time, independent of the right knee's own animation."""
+
+    elbow_signal = _smoothed_random_walk(num_frames, scale=8.0, offset=135.0, seed=1)
+    knee_signal = _smoothed_random_walk(num_frames, scale=6.0, offset=150.0, seed=2)
+    hip_signal = _smoothed_random_walk(num_frames, scale=5.0, offset=130.0, seed=3)
+    base_wobble = _smoothed_random_walk(num_frames, scale=3.0, offset=0.0, seed=35)
+    extra_wobble = (
+        _smoothed_random_walk(num_frames, scale=extra_wobble_scale, offset=0.0, seed=extra_wobble_seed)
+        if extra_wobble_scale
+        else np.zeros(num_frames)
+    )
+
+    frames = []
+    for t in range(num_frames):
+        kp = _base_pose()
+        _set_angle(kp, L_SHOULDER, L_ELBOW, L_WRIST, elbow_signal[t])
+        _set_angle(kp, R_HIP, R_KNEE, R_ANKLE, knee_signal[t])
+        _set_angle(kp, L_SHOULDER, L_HIP, L_KNEE, hip_signal[t])
+        kp[L_ANKLE] = kp[L_ANKLE] + np.array([base_wobble[t] + extra_wobble[t], 0.0])
+        frames.append(kp)
+    return frames
+
+
+def test_balance_issue_fires_when_wobble_exceeds_the_reference():
+    num_frames = 40
+    reference = _animated_sequence_with_wobble(num_frames, extra_wobble_scale=0.0)
+    # note: shifting the left ankle (to plant a balance difference) also
+    # perturbs the measured left_knee angle, since the ankle keypoint is
+    # shared between the two features -- same adjacent-keypoint leakage
+    # documented in scripts/eval_planted_errors.py. This test only
+    # checks that a "balance" issue appears among the flagged types, not
+    # that it's the *only* one, so that leakage doesn't invalidate it.
+    bad_user = _animated_sequence_with_wobble(num_frames, extra_wobble_scale=9.0)
+    frame_indices = list(range(num_frames))
+
+    result = score_analysis(reference, frame_indices, 30.0, bad_user, frame_indices, 30.0)
+
+    flagged_types = {issue.type for s in result.segments for issue in s.issues}
+    assert "balance" in flagged_types
+
+
+def _dampened_animated_sequence(num_frames: int, damp: float) -> list[np.ndarray]:
+    """Like _animated_sequence, but the fluctuation *amplitude* of every
+    signal is scaled by `damp` around the same mean -- damp=1.0 is
+    identical to _animated_sequence; damp<1 moves much less without
+    changing the average pose much, which is what "low energy" should
+    detect (as distinct from "wrong angle")."""
+
+    elbow_signal = _smoothed_random_walk(num_frames, scale=8.0, offset=135.0, seed=1)
+    knee_signal = _smoothed_random_walk(num_frames, scale=6.0, offset=150.0, seed=2)
+    hip_signal = _smoothed_random_walk(num_frames, scale=5.0, offset=130.0, seed=3)
+    elbow_signal = 135.0 + (elbow_signal - 135.0) * damp
+    knee_signal = 150.0 + (knee_signal - 150.0) * damp
+    hip_signal = 130.0 + (hip_signal - 130.0) * damp
+
+    frames = []
+    for t in range(num_frames):
+        kp = _base_pose()
+        _set_angle(kp, L_SHOULDER, L_ELBOW, L_WRIST, elbow_signal[t])
+        _set_angle(kp, R_HIP, R_KNEE, R_ANKLE, knee_signal[t])
+        _set_angle(kp, L_SHOULDER, L_HIP, L_KNEE, hip_signal[t])
+        frames.append(kp)
+    return frames
+
+
+def test_energy_issue_fires_when_user_moves_much_less_than_reference():
+    num_frames = 60
+    reference = _dampened_animated_sequence(num_frames, damp=1.0)
+    bad_user = _dampened_animated_sequence(num_frames, damp=0.15)
+    frame_indices = list(range(num_frames))
+
+    result = score_analysis(reference, frame_indices, 30.0, bad_user, frame_indices, 30.0)
+
+    flagged_types = {issue.type for s in result.segments for issue in s.issues}
+    assert "energy" in flagged_types
+
+
+def test_energy_issue_does_not_fire_when_reference_itself_is_still():
+    # both sides nearly frozen -- there's no real reference motion to
+    # be "missing", so this must not fire (see MIN_REFERENCE_ENERGY_DEG)
+    num_frames = 40
+    reference = _dampened_animated_sequence(num_frames, damp=0.02)
+    bad_user = _dampened_animated_sequence(num_frames, damp=0.02)
+    frame_indices = list(range(num_frames))
+
+    result = score_analysis(reference, frame_indices, 30.0, bad_user, frame_indices, 30.0)
+
+    flagged_types = {issue.type for s in result.segments for issue in s.issues}
+    assert "energy" not in flagged_types
+
+
+def test_tempo_issue_flags_a_likely_skipped_move():
+    reference = _animated_sequence(60)  # 2s at 30fps
+    bad_user = reference[0:20] + reference[40:60]  # the middle 20 frames are missing entirely
+
+    result = score_analysis(
+        reference, list(range(60)), 30.0, bad_user, list(range(len(bad_user))), 30.0, segment_seconds=0.5
+    )
+
+    tempo_issues = [issue for s in result.segments for issue in s.issues if issue.type == "tempo"]
+    assert tempo_issues, "expected at least one tempo issue for the skipped chunk"
+    assert any("skipped" in issue.message for issue in tempo_issues)
+
+
+def test_tempo_issue_flags_a_likely_added_move():
+    reference = _animated_sequence(40)
+    # frames 10-19 are repeated, as if the dancer added or repeated a move
+    bad_user = reference[0:10] + reference[10:20] + reference[10:20] + reference[20:40]
+
+    result = score_analysis(
+        reference, list(range(40)), 30.0, bad_user, list(range(len(bad_user))), 30.0, segment_seconds=0.5
+    )
+
+    tempo_issues = [issue for s in result.segments for issue in s.issues if issue.type == "tempo"]
+    assert tempo_issues, "expected at least one tempo issue for the repeated chunk"
+    assert any("added or repeated" in issue.message for issue in tempo_issues)

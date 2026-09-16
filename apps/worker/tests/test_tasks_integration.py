@@ -207,7 +207,7 @@ def test_full_pipeline_scores_a_real_user_clip_against_a_real_reference_clip():
             assert 0.0 <= segment["score"] <= 100.0
             assert segment["t1"] >= segment["t0"]
             for issue in segment["issues"]:
-                assert issue["type"] in ("angle", "timing", "path")
+                assert issue["type"] in ("angle", "timing", "path", "occlusion", "tempo", "energy", "balance")
                 assert issue["message"]
     finally:
         db.close()

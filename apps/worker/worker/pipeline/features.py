@@ -35,7 +35,12 @@ JOINT_ANGLE_TRIPLES: dict[str, tuple[int, int, int]] = {
     "right_shoulder": (R_HIP, R_SHOULDER, R_ELBOW),
 }
 
-FEATURE_NAMES: list[str] = list(JOINT_ANGLE_TRIPLES) + ["spine_lean"]
+# The 8 limb joint angles -- used by scoring.py to compute "motion energy"
+# (frame-to-frame change) without spine_lean/balance_offset diluting it,
+# since those two are about posture/stance, not limb movement.
+LIMB_JOINT_NAMES: list[str] = list(JOINT_ANGLE_TRIPLES)
+
+FEATURE_NAMES: list[str] = LIMB_JOINT_NAMES + ["spine_lean", "balance_offset"]
 
 
 DEFAULT_MIN_CONFIDENCE = 0.3
@@ -116,6 +121,37 @@ def spine_lean_deg(
     return float(np.degrees(np.arctan2(vector[0], -vector[1])))
 
 
+def balance_offset(
+    keypoints: np.ndarray, scores: np.ndarray | None = None, min_confidence: float = DEFAULT_MIN_CONFIDENCE
+) -> float:
+    """Horizontal distance from the hip midpoint to the ankle midpoint
+    (the base of support), normalized by hip width so it's comparable
+    across dancers/distances-from-camera. Like spine_lean, this is
+    measured in the camera's frame, not intrinsic to the pose, so
+    `feature_sequence` baseline-corrects it per video -- what's
+    compared is *wobble away from one's own stance*, not absolute
+    stance width (which varies by dancer and framing for reasons that
+    have nothing to do with balance).
+
+    NaN if any of the four keypoints it depends on (both hips, both
+    ankles) is below `min_confidence`, or if the hips are degenerate
+    (near-zero width, making normalization meaningless).
+    """
+
+    if scores is not None and any(
+        scores[i] < min_confidence for i in (L_HIP, R_HIP, L_ANKLE, R_ANKLE)
+    ):
+        return float("nan")
+
+    hip_width = np.linalg.norm(keypoints[L_HIP] - keypoints[R_HIP])
+    if hip_width < 1e-6:
+        return float("nan")
+
+    mid_hip = (keypoints[L_HIP] + keypoints[R_HIP]) / 2
+    mid_ankle = (keypoints[L_ANKLE] + keypoints[R_ANKLE]) / 2
+    return float((mid_hip[0] - mid_ankle[0]) / hip_width)
+
+
 def feature_sequence(
     keypoint_sequence: list[np.ndarray],
     score_sequence: list[np.ndarray] | None = None,
@@ -136,12 +172,19 @@ def feature_sequence(
         frame_scores = score_sequence[i] if score_sequence is not None else None
         angles = joint_angles(kp, frame_scores, min_confidence)
         lean = spine_lean_deg(kp, frame_scores, min_confidence)
-        rows.append([angles[name] for name in JOINT_ANGLE_TRIPLES] + [lean])
+        balance = balance_offset(kp, frame_scores, min_confidence)
+        rows.append([angles[name] for name in LIMB_JOINT_NAMES] + [lean, balance])
     matrix = np.array(rows, dtype=float)
 
-    spine_idx = FEATURE_NAMES.index("spine_lean")
-    column = matrix[:, spine_idx]
-    valid = ~np.isnan(column)
-    if valid.any():
-        matrix[:, spine_idx] = column - np.nanmedian(column[valid])
+    # spine_lean and balance_offset are measured against the camera's
+    # frame, not intrinsic to the pose -- baseline-correct both so what's
+    # compared is deviation from each video's own median, not an absolute
+    # value that differs for reasons unrelated to technique (camera tilt,
+    # natural stance width).
+    for name in ("spine_lean", "balance_offset"):
+        idx = FEATURE_NAMES.index(name)
+        column = matrix[:, idx]
+        valid = ~np.isnan(column)
+        if valid.any():
+            matrix[:, idx] = column - np.nanmedian(column[valid])
     return matrix

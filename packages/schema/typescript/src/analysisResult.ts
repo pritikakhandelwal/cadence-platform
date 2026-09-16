@@ -17,7 +17,24 @@ export type AnalysisStatus =
   | "complete"
   | "rejected";
 
-export type IssueType = "angle" | "timing" | "path";
+// "angle": a joint's angle differs from the reference (arm/leg joints alike -- the
+//   `joint` field, e.g. "left_elbow" vs "right_knee", distinguishes arm from leg;
+//   there's no separate arm/leg type).
+// "timing": reference/user time gap is growing (independent of score).
+// "path": spatial trajectory deviation -- reserved, not generated yet.
+// "occlusion": a joint was too low-confidence to score for part of this window.
+// "tempo": local DTW stretch/compression -- a move happened notably faster/slower,
+//   or was likely skipped/added, vs the reference.
+// "energy": overall movement magnitude in this window is well below the reference.
+// "balance": hip position wanders from the base of support more than the reference.
+export type IssueType =
+  | "angle"
+  | "timing"
+  | "path"
+  | "occlusion"
+  | "tempo"
+  | "energy"
+  | "balance";
 
 export interface TrackingInfo {
   confidence: number; // 0..1

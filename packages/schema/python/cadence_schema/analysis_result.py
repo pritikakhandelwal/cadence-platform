@@ -24,9 +24,16 @@ class AnalysisStatus(str, Enum):
 
 
 class IssueType(str, Enum):
-    angle = "angle"
-    timing = "timing"
-    path = "path"
+    angle = "angle"       # a joint's angle differs from the reference (arm/leg joints alike --
+                           # the `joint` field, e.g. "left_elbow" vs "right_knee", is what
+                           # distinguishes arm from leg; there's no separate arm/leg type)
+    timing = "timing"      # reference/user time gap is growing (independent of score)
+    path = "path"          # spatial trajectory deviation -- reserved, not generated yet
+    occlusion = "occlusion"  # a joint was too low-confidence to score for part of this window
+    tempo = "tempo"        # local DTW stretch/compression -- a move happened notably
+                           # faster/slower, or was likely skipped/added, vs the reference
+    energy = "energy"      # overall movement magnitude in this window is well below the reference
+    balance = "balance"    # hip position wanders from the base of support more than the reference
 
 
 class TrackingInfo(BaseModel):
