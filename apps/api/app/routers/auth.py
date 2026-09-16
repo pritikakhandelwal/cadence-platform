@@ -1,12 +1,11 @@
 from __future__ import annotations
 
+from cadence_db import User, get_db
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from ..db import get_db
 from ..deps import SESSION_COOKIE_NAME, get_current_user
-from ..models import User
 from ..rate_limit import login_rate_limit, register_rate_limit
 from ..security import auth as auth_service
 from ..security.input_validation import validate_registration_fields

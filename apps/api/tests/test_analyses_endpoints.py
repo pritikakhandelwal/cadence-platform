@@ -44,6 +44,28 @@ def test_upload_creates_a_persisted_queued_analysis(client, tiny_mp4_bytes):
     assert result["quality_gate"]["passed"] is False
 
 
+def test_upload_enqueues_the_phase_2_detect_tracks_job(client, fake_queue, tiny_mp4_bytes):
+    _register_and_login(client)
+
+    response = client.post(
+        "/analyses",
+        files={
+            "professional_video": ("pro.mp4", tiny_mp4_bytes, "video/mp4"),
+            "user_video": ("user.mp4", tiny_mp4_bytes, "video/mp4"),
+        },
+    )
+    assert response.status_code == 201
+    analysis_id = response.json()["analysis_id"]
+
+    assert len(fake_queue.enqueued) == 1
+    job = fake_queue.enqueued[0]
+    assert job["function"] == "detect_tracks_job"
+    assert job["kwargs"]["analysis_id"] == analysis_id
+    # locks onto the user's own upload, not the professional reference --
+    # see docs/decisions.md
+    assert job["kwargs"]["video_path"].endswith("user_upload.mp4")
+
+
 def test_upload_rejects_invalid_video(client):
     _register_and_login(client)
 

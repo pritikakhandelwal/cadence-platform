@@ -1,10 +1,10 @@
-"""Database engine/session setup.
+"""Database engine/session setup, shared by apps/api and apps/worker.
 
-Production uses Postgres (set DATABASE_URL, e.g.
-postgresql+psycopg2://user:pass@host:5432/cadence). Tests and local
-scratch runs default to a SQLite file so nobody needs Postgres running
-just to run `pytest`. Models avoid Postgres-only column types so both
-dialects work identically.
+Both processes talk to the same DATABASE_URL (Postgres in prod, SQLite
+by default/in tests) so a worker job can write an analysis result and
+the API can read it back without a callback API between them --
+matching the architecture diagram in ROADMAP.md, where both the API
+and the workers connect to PostgreSQL directly.
 """
 
 from __future__ import annotations
@@ -27,6 +27,8 @@ class Base(DeclarativeBase):
 
 
 def get_db() -> Iterator[Session]:
+    """FastAPI dependency: yields a session, closes it after the request."""
+
     db = SessionLocal()
     try:
         yield db

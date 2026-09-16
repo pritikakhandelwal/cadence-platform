@@ -65,7 +65,7 @@ def test_session_round_trip(db_session):
 
 
 def test_legacy_sha256_hash_upgrades_on_successful_login(db_session):
-    from app.models import User
+    from cadence_db import User
 
     legacy_hash = auth_service._legacy_sha256("correct-horse-battery")
     user = User(name="Ada", email="ada@example.com", password_hash=legacy_hash)

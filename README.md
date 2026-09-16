@@ -9,18 +9,22 @@ Full plan: [`ROADMAP.md`](ROADMAP.md). Current build state: [`STATUS.md`](STATUS
 ```text
 apps/
   web/      Next.js Arena UI (placeholder in Phase 0, real UI from Phase 4)
-  api/      FastAPI BFF — auth, uploads, AnalysisResult API
-  worker/   arq background jobs — pose/tracking, alignment/scoring
+  api/      FastAPI BFF — auth, uploads, AnalysisResult API, enqueues Phase 2 jobs
+  worker/   arq background jobs — detect/track/lock/pose (Phase 2), alignment/scoring (Phase 3)
 packages/
-  schema/   the canonical AnalysisResult contract (Python + TypeScript)
+  schema/     the canonical AnalysisResult contract (Python + TypeScript)
+  db/         shared SQLAlchemy models (Postgres/SQLite) -- both apps/api and apps/worker
+              talk to the same DB directly, no callback API between them
+  workspace/  shared per-analysis file-workspace helpers -- apps/api writes uploads,
+              apps/worker reads them, both need to agree on where they live
 legacy/
   cadence-streamlit/   the original Streamlit prototype, kept runnable for reference
 docs/
   decisions.md   why certain features are scoped the way they are
 ```
 
-Every app has its own README with setup/run/test instructions:
-[`apps/web`](apps/web/README.md) · [`apps/api`](apps/api/README.md) · [`apps/worker`](apps/worker/README.md) · [`packages/schema`](packages/schema/README.md) · [`legacy/cadence-streamlit`](legacy/cadence-streamlit/README.md)
+Every app/package has its own README with setup/run/test instructions:
+[`apps/web`](apps/web/README.md) · [`apps/api`](apps/api/README.md) · [`apps/worker`](apps/worker/README.md) · [`packages/schema`](packages/schema/README.md) · [`packages/db`](packages/db/README.md) · [`packages/workspace`](packages/workspace/README.md) · [`legacy/cadence-streamlit`](legacy/cadence-streamlit/README.md)
 
 ## Quick start
 
@@ -48,11 +52,11 @@ streamlit run app.py
 
 FFmpeg (`ffprobe`) must be on `PATH` for both the legacy app and `apps/api` video validation/tests.
 
-`apps/api` now has real endpoints — `POST /auth/register`, `POST /auth/login`, `GET /auth/me`, `POST /analyses` (upload + validate two MP4s), `GET /analyses/{id}`. See [`apps/api/README.md`](apps/api/README.md) for the full list. `apps/web` doesn't call any of this yet — it's still the Phase 0 placeholder page.
+`apps/api` now has real endpoints — `POST /auth/register`, `POST /auth/login`, `GET /auth/me`, `POST /analyses` (upload + validate two MP4s, then enqueues Phase 2's `detect_tracks_job`), `GET /analyses/{id}`. See [`apps/api/README.md`](apps/api/README.md) for the full list. `apps/web` doesn't call any of this yet — it's still the Phase 0 placeholder page.
 
 ## Where things actually stand
 
-Phases 0 and 1 are done: `apps/api` has real accounts (Argon2id + lockout), validated video uploads (magic bytes + ffprobe), UUID-isolated workspaces, and persisted analysis rows — ported from the legacy app rather than rewritten. Phase 2 (YOLO + tracking lock-on, replacing legacy's full-frame MediaPipe) is next and hasn't started. Read [`STATUS.md`](STATUS.md) before starting work on any phase; it tracks what's actually done vs. planned, since the two drift.
+Phases 0 and 1 are done. Phase 2 (YOLO + ByteTrack lock-on + RTMPose, replacing legacy's full-frame MediaPipe) has a real, working pipeline, wired end-to-end for the auto-lock path: upload → `apps/api` enqueues a job → `apps/worker` detects/tracks/locks/scores → writes the result into the same `analyses` table `apps/api` reads from. What's still missing there: a pick-UI for the `needs_dancer_pick` case (correctly detected, nothing can act on it yet), and a real eval dataset beyond two synthetic ffmpeg-composited stress clips. Read [`STATUS.md`](STATUS.md) before starting work on any phase; it tracks what's actually done vs. planned, since the two drift.
 
 ## Contributing to this repo
 

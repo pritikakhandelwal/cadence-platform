@@ -26,6 +26,18 @@ This lives in Phase 5 + Phase 6 of [`ROADMAP.md`](../ROADMAP.md).
 - Labeled data for Indian classical forms is scarce publicly; you're mostly self-collecting, which is slow.
 - Building this before lock-on (Phase 2) is reliable is explicitly called out as a project-killing sequencing mistake in Section 7 of the roadmap.
 
+## Shared DB and workspace packages, not a callback API
+
+**Ask (implicit):** once `apps/worker` needs to write an analysis result somewhere `apps/api` can read it back from, how do the two processes share that state?
+
+**Decision:** both talk to the same Postgres/SQLite directly, via new shared packages (`packages/db` for the SQLAlchemy models, `packages/workspace` for the per-analysis file paths) rather than an HTTP callback from worker to API.
+
+**Why:**
+- The roadmap's own architecture diagram (§2) already draws both the API and the workers connecting to PostgreSQL directly — a callback API would be inventing a different architecture than the one already decided.
+- A callback endpoint is a second surface to authenticate, version, and keep in sync with the DB schema, for no benefit over just writing the row directly when both processes already have `DATABASE_URL`.
+- `packages/workspace` exists for the same reason on the filesystem side: `apps/api` writes uploaded videos, `apps/worker` needs to read the exact same files to run detection/pose on them. Its default runtime directory is resolved relative to the *package's* location in the repo, not whichever app imports it, so the two processes agree on the same path without either one setting `CADENCE_RUNTIME_DIR` by hand for local dev.
+- Both packages started as private modules inside `apps/api` in Phase 1, when only the API needed them. Moved out in Phase 2 the moment a second process needed the same logic — not extracted preemptively "in case it's needed later."
+
 ## SQLite → Postgres
 
 Legacy app uses SQLite (fine for a single-process demo). Production target is Postgres per the locked architecture — SQLite does not survive concurrent writers safely. Migration happens in Phase 1/7.

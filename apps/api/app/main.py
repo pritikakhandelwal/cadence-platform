@@ -13,7 +13,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from .db import init_db
+from cadence_db import init_db
+
 from .routers import analyses, auth
 
 

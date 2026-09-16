@@ -1,11 +1,21 @@
-"""Per-analysis file workspaces.
+"""Per-analysis file workspaces, shared by apps/api and apps/worker.
 
-Ported from legacy/cadence-streamlit/modules/workspace.py — unchanged
-except PROJECT_ROOT now resolves to apps/api, and a cleanup_abandoned_workspaces
-helper was added (roadmap Phase 1: "Cleanup job (abandoned workspaces)").
+Originally ported from legacy/cadence-streamlit/modules/workspace.py.
+Moved to a shared package (rather than living inside apps/api) because
+apps/worker needs to read the same upload files apps/api wrote --
+without this, the two processes would need their own private copy of
+this path logic and could silently drift.
 
-Uploaded videos and generated artifacts must never use shared fixed filenames.
-Each analysis run receives an isolated directory under ``runtime/analyses``.
+The default runtime root is resolved relative to this package's
+location in the monorepo checkout (<repo_root>/runtime), not relative
+to whichever app imports it -- so apps/api and apps/worker agree on
+the same directory without either one having to set CADENCE_RUNTIME_DIR
+by hand for local dev. Set CADENCE_RUNTIME_DIR explicitly in production
+once this points at object storage instead of a local disk (Phase 7).
+
+Uploaded videos and generated artifacts must never use shared fixed
+filenames. Each analysis run receives an isolated directory under
+``runtime/analyses``.
 """
 
 from __future__ import annotations
@@ -17,12 +27,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from uuid import uuid4
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+# cadence_workspace/workspace.py -> cadence_workspace -> workspace -> packages -> repo root
+_REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 def _runtime_root() -> Path:
     configured_root = os.getenv("CADENCE_RUNTIME_DIR")
-    return Path(configured_root) if configured_root else PROJECT_ROOT / "runtime"
+    return Path(configured_root) if configured_root else _REPO_ROOT / "runtime"
 
 
 @dataclass(frozen=True)
@@ -61,6 +72,15 @@ class AnalysisWorkspace:
         return self.root / "overlay.mp4"
 
 
+def workspace_for(run_id: str, base_dir: Path | None = None) -> AnalysisWorkspace:
+    """Reconstruct the workspace for an existing run_id (e.g. from a
+    worker job that only has Analysis.workspace_id, not the original
+    AnalysisWorkspace object)."""
+
+    analyses_dir = base_dir or (_runtime_root() / "analyses")
+    return AnalysisWorkspace(run_id=run_id, root=analyses_dir / run_id)
+
+
 def create_analysis_workspace(base_dir: Path | None = None) -> AnalysisWorkspace:
     """Create an isolated workspace for one analysis run."""
 
@@ -84,8 +104,8 @@ def remove_analysis_workspace(workspace: AnalysisWorkspace) -> None:
 def cleanup_abandoned_workspaces(max_age_hours: float = 24, base_dir: Path | None = None) -> list[str]:
     """Remove workspace directories older than max_age_hours.
 
-    Intended to run on a schedule (see apps/worker's cron job) so a
-    crashed upload or an analysis nobody ever finished doesn't leak
+    Intended to run on a schedule (see apps/api/scripts/cleanup_workspaces.py)
+    so a crashed upload or an analysis nobody ever finished doesn't leak
     disk forever. Returns the run_ids removed.
     """
 

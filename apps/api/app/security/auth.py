@@ -16,10 +16,10 @@ from datetime import datetime, timedelta, timezone
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
 from argon2.low_level import Type
+from cadence_db import LoginSecurity, User, UserSession
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from ..models import LoginSecurity, User, UserSession
 from .input_validation import validate_registration_fields
 
 MAX_FAILED_ATTEMPTS = 5

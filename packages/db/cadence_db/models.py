@@ -56,10 +56,21 @@ class UserSession(Base):
 
 
 class Analysis(Base):
-    """One dance-analysis run. `result` holds the AnalysisResult payload
-    (packages/schema) once a worker job has produced one; NULL while
-    queued. Phase 2/3 fill this in — Phase 1 only guarantees the row
-    exists and survives a page refresh."""
+    """One dance-analysis run.
+
+    `result` holds the AnalysisResult payload (packages/schema) once a
+    worker job has produced a final (complete/rejected) outcome; NULL
+    while queued/running/needs_dancer_pick.
+
+    `pending_lock_data` holds the raw detections a detect_tracks_job
+    produced when it couldn't confidently auto-lock a single dancer
+    (multiple comparably-sized tracks -- see
+    apps/worker/worker/pipeline/quality.py's is_lock_ambiguous). A
+    future POST /analyses/{id}/lock endpoint would read this to finish
+    the job without re-running YOLO; that endpoint doesn't exist yet,
+    so today `needs_dancer_pick` is a real, correctly-detected status
+    with no way for a user to act on it. See STATUS.md.
+    """
 
     __tablename__ = "analyses"
 
@@ -68,5 +79,6 @@ class Analysis(Base):
     workspace_id: Mapped[str] = mapped_column(String(32))
     status: Mapped[str] = mapped_column(String(32), default="queued")
     result: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    pending_lock_data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now)

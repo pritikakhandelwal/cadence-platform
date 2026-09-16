@@ -1,10 +1,9 @@
 from __future__ import annotations
 
+from cadence_db import User, get_db
 from fastapi import Cookie, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from .db import get_db
-from .models import User
 from .security.auth import get_user_for_token
 
 SESSION_COOKIE_NAME = "cadence_session"

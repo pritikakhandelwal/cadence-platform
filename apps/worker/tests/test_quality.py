@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from worker.pipeline.quality import (
     Detection,
+    TrackSummary,
     compute_lock_quality,
     evaluate_quality_gate,
+    is_lock_ambiguous,
     summarize_tracks,
 )
 
@@ -94,3 +96,36 @@ def test_quality_gate_rejects_no_detections():
     quality = compute_lock_quality([], locked_track_id=1, total_frames=100, fps=30.0)
     gate = evaluate_quality_gate(quality)
     assert gate.passed is False
+
+
+def _track(track_id, frame_count, fragments=1):
+    return TrackSummary(
+        track_id=track_id, frame_count=frame_count, first_frame=0, last_frame=frame_count - 1,
+        mean_confidence=0.9, fragments=fragments,
+    )
+
+
+def test_is_lock_ambiguous_false_for_a_solo_track():
+    assert is_lock_ambiguous([_track(1, 100)]) is False
+
+
+def test_is_lock_ambiguous_false_for_a_clearly_dominant_track():
+    # a brief background passerby shouldn't block auto-locking the main dancer
+    assert is_lock_ambiguous([_track(1, 100), _track(2, 10)]) is False
+
+
+def test_is_lock_ambiguous_true_for_two_comparable_tracks():
+    # real numbers from the duo stress clip (two distinct real dancers,
+    # both 100% frame coverage) -- see STATUS.md
+    assert is_lock_ambiguous([_track(1, 108), _track(2, 108)]) is True
+
+
+def test_is_lock_ambiguous_true_for_the_mirror_case():
+    # real numbers from the mirror stress clip (one dancer + their own
+    # flipped reflection, producing 4 fragmented tracks) -- see STATUS.md
+    tracks = [_track(2, 102, fragments=2), _track(1, 63, fragments=4), _track(9, 51), _track(8, 2)]
+    assert is_lock_ambiguous(tracks) is True
+
+
+def test_is_lock_ambiguous_false_for_empty_tracks():
+    assert is_lock_ambiguous([]) is False

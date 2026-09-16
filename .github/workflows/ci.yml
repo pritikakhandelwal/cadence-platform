@@ -27,6 +27,26 @@ jobs:
       - working-directory: packages/schema/typescript
         run: npm run typecheck
 
+  db:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e packages/db pytest
+      - run: pytest packages/db/tests
+
+  workspace:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e packages/workspace pytest
+      - run: pytest packages/workspace/tests
+
   api:
     runs-on: ubuntu-latest
     steps:

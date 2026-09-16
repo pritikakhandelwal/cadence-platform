@@ -3,12 +3,13 @@ from __future__ import annotations
 import subprocess
 
 import pytest
+from cadence_db import Base, get_db
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from app.db import Base, get_db
 from app.main import app
+from app.queue import get_queue
 
 
 @pytest.fixture()
@@ -38,12 +39,36 @@ def db_session(db_engine):
     app.dependency_overrides.clear()
 
 
+class FakeQueue:
+    """Stands in for the real arq pool -- this repo has no live Redis to
+    test against (no Docker in this dev environment). Records what
+    would have been enqueued so tests can assert on it; see
+    STATUS.md's Phase 2 section for what "actually enqueued through a
+    real queue" would still need to be verified."""
+
+    def __init__(self) -> None:
+        self.enqueued: list[dict] = []
+
+    async def enqueue_job(self, function: str, *args, **kwargs) -> None:
+        self.enqueued.append({"function": function, "args": args, "kwargs": kwargs})
+
+
 @pytest.fixture()
-def client(db_session, tmp_path, monkeypatch):
+def fake_queue():
+    return FakeQueue()
+
+
+@pytest.fixture()
+def client(db_session, fake_queue, tmp_path, monkeypatch):
     from app.rate_limit import login_rate_limit, register_rate_limit
 
     login_rate_limit._hits.clear()
     register_rate_limit._hits.clear()
+
+    async def override_get_queue():
+        yield fake_queue
+
+    app.dependency_overrides[get_queue] = override_get_queue
 
     monkeypatch.setenv("CADENCE_RUNTIME_DIR", str(tmp_path / "runtime"))
     with TestClient(app) as test_client:

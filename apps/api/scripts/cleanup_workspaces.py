@@ -2,21 +2,19 @@
 """Remove abandoned analysis workspaces older than --max-age-hours.
 
 Intended to run on a schedule (cron / Windows Task Scheduler / a
-platform scheduled job) against the same CADENCE_RUNTIME_DIR the API
-process uses. Not wired into apps/worker because the worker doesn't
-necessarily share a filesystem with the API in production (object
-storage replaces local workspaces in Phase 7 anyway).
+platform scheduled job) against the same CADENCE_RUNTIME_DIR both
+apps/api and apps/worker use (packages/workspace, shared by both now
+that apps/worker actually reads uploaded videos). Not run from inside
+apps/worker itself -- keeping cleanup on a separate schedule rather
+than tied to job execution -- and this local-disk assumption goes away
+once Phase 7 moves uploads to object storage.
 """
 
 from __future__ import annotations
 
 import argparse
-import sys
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from app.workspace import cleanup_abandoned_workspaces  # noqa: E402
+from cadence_workspace import cleanup_abandoned_workspaces
 
 
 def main() -> None:

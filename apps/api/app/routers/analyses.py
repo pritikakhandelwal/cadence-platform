@@ -1,18 +1,18 @@
 from __future__ import annotations
 
+from cadence_db import Analysis, User, get_db
 from cadence_schema import AnalysisResult, AnalysisStatus, QualityGate, TrackingInfo
+from cadence_workspace import create_analysis_workspace, remove_analysis_workspace
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
-from ..db import get_db
 from ..deps import get_current_user
-from ..models import Analysis, User
+from ..queue import JobQueue, get_queue
 from ..security.video_validation import (
     VideoValidationError,
     validate_saved_video,
     validate_uploaded_video,
 )
-from ..workspace import create_analysis_workspace, remove_analysis_workspace
 
 router = APIRouter(prefix="/analyses", tags=["analyses"])
 
@@ -29,6 +29,7 @@ async def create_analysis(
     user_video: UploadFile,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    queue: JobQueue = Depends(get_queue),
 ) -> dict[str, str]:
     for upload in (professional_video, user_video):
         try:
@@ -54,9 +55,15 @@ async def create_analysis(
     db.add(analysis)
     db.commit()
 
-    # Phase 2/3 enqueue the real detect->track->pose->align job here
-    # (apps/worker) and fill in `analysis.result`. For now the row
-    # existing and being retrievable is the Phase 1 contract.
+    # Phase 2 lock-on runs on the user's own video, not the professional
+    # reference -- the reference is assumed pre-vetted/clean; the user's
+    # upload is the messy one that can have a second person, a mirror,
+    # etc. Phase 3 (alignment/scoring) is what will need pose for the
+    # reference video too, via a simpler path since it doesn't need
+    # multi-person lock-on. See docs/decisions.md.
+    await queue.enqueue_job(
+        "detect_tracks_job", analysis_id=analysis.id, video_path=str(workspace.user_upload)
+    )
 
     return {"analysis_id": analysis.id, "status": analysis.status}
 
@@ -74,10 +81,15 @@ def get_analysis(
     if analysis.result:
         return AnalysisResult.model_validate(analysis.result)
 
+    reason = (
+        "Multiple people were detected and picking one isn't supported by this API yet."
+        if analysis.status == AnalysisStatus.needs_dancer_pick.value
+        else "Analysis has not been processed yet."
+    )
     return AnalysisResult(
         analysis_id=analysis.id,
         user_id=analysis.user_id,
         status=AnalysisStatus(analysis.status),
         tracking=TrackingInfo(confidence=0, reliable_frame_pct=0, person_count=0),
-        quality_gate=QualityGate(passed=False, reasons=["Analysis has not been processed yet."]),
+        quality_gate=QualityGate(passed=False, reasons=[reason]),
     )

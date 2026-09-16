@@ -5,7 +5,10 @@ sqlalchemy>=2.0
 argon2-cffi>=23.1
 psycopg2-binary>=2.9   # Postgres driver for production (DATABASE_URL)
 python-multipart>=0.0.9
+arq>=0.26               # enqueues Phase 2 pipeline jobs onto apps/worker
 -e ../../packages/schema/python
+-e ../../packages/db
+-e ../../packages/workspace
 
 # dev
 pytest>=8.0

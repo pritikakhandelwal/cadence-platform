@@ -116,6 +116,31 @@ class QualityGateResult:
     reasons: list[str] = field(default_factory=list)
 
 
+def is_lock_ambiguous(tracks: list[TrackSummary], dominance_ratio: float = 0.5) -> bool:
+    """True if there's no single clearly-dominant track -- i.e. picking
+    the track with the most frames would be a guess, not a confident
+    lock.
+
+    Found by testing against a synthetic mirror clip (one dancer +
+    their own horizontally-flipped reflection): YOLO+ByteTrack produced
+    4 fragmented track IDs for what's really one person + one
+    reflection, and naively locking onto "whichever track has the most
+    frames" would silently pick one without any signal that the scene
+    was ambiguous. This catches that case (and the equally real case
+    of two actual people of comparable screen time) by comparing the
+    top two tracks' frame counts -- it does not try to guess *which*
+    track is the real dancer, it just refuses to guess at all. See
+    STATUS.md's Phase 2 section for the actual numbers from that test.
+    """
+
+    if len(tracks) <= 1:
+        return False
+    largest, second = tracks[0].frame_count, tracks[1].frame_count
+    if largest == 0:
+        return True
+    return (second / largest) >= dominance_ratio
+
+
 def evaluate_quality_gate(
     quality: LockQuality,
     min_reliable_frame_pct: float = 60.0,
