@@ -61,11 +61,13 @@ class AnalysisWorkspace:
 
     @property
     def professional_keypoints(self) -> Path:
-        return self.root / "professional_keypoints.npy"
+        """npz with `keypoints` (N, 17, 2), `frame_indices` (N,), `fps` (scalar) --
+        written by apps/worker's pose jobs (Phase 2), read by Phase 3 scoring."""
+        return self.root / "professional_keypoints.npz"
 
     @property
     def user_keypoints(self) -> Path:
-        return self.root / "user_keypoints.npy"
+        return self.root / "user_keypoints.npz"
 
     @property
     def overlay(self) -> Path:

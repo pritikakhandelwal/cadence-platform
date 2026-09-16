@@ -46,6 +46,22 @@ Legacy app uses SQLite (fine for a single-process demo). Production target is Po
 
 Legacy app runs MediaPipe on the full frame. This breaks on multi-person shots, mirrors, and occlusion — exactly the real-world conditions dance video has. Phase 2 replaces this with detect → track → crop → pose. MediaPipe stays only as a fallback for a future live-webcam v1 (Phase 8).
 
+## Scoring formula: a transform over a principled feature, not "no formula"
+
+**Tension:** the roadmap's Section 7 explicitly calls out `100 - similarity*2`-style formulas as the fake score to replace, but *any* score is ultimately some function mapping an error measure to a number -- so what makes one formula legitimate and another not?
+
+**Decision:** `score = 100 * exp(-mean_abs_angle_error_deg / TAU)`, with `TAU` chosen and documented against one stated reference point (a 20-degree average joint-angle error gives 50%), computed over normalized joint angles + DTW alignment, not raw pixel distance.
+
+**Why this isn't the same anti-pattern with extra steps:** the legacy formula's problem was never "it's a formula" -- it's that it ran on unaligned, unnormalized raw coordinates, so the *number it fed into* wasn't measuring anything real. Fixing the feature (rotation/scale/translation-invariant joint angles) and the alignment (DTW, not frame-index-order) is the actual fix. The transform on top still has to be *some* function, and choosing one with a named, checkable meaning ("half credit at 20 degrees") is the difference between "a formula" and "an arbitrary formula" -- not the presence of a formula at all.
+
+## 2D pose comparison conflates real angle differences with camera viewpoint -- known, not fixed
+
+**Found:** scoring the two real available clips (`professional_dance.mp4`, `user_dance.mp4`) against each other, hip-joint angle differences stayed large (40-90 degrees) even after adding confidence-masking for low-visibility keypoints (see `apps/worker/README.md`'s Phase 3 section). Checked actual RTMPose confidence for those hip keypoints: ~0.6, moderate, not clearly garbage -- so this isn't (only) a masking problem.
+
+**Why, and why it's not being patched now:** RTMPose-m here is 2D-only. A joint-angle triple computed from 2D image coordinates is invariant to in-plane rotation, but *not* to the camera's viewing angle -- the same 3D hip pose, filmed from two different camera angles (which is exactly what two independently-recorded phone videos would have), can legitimately project to two different 2D angles. This pipeline cannot currently tell "the dancer's hip is genuinely at a different angle" apart from "the camera is looking at the same hip from a different side." That's a real, unresolved limitation, not a bug -- fixing it means 3D pose (the roadmap's own Phase 8: "Optional SMPL mesh for nicer 3D", and 3D is explicitly deferred there for a reason). Tuning the confidence threshold or the angle-issue cutoff to make hip errors disappear on this *one* clip pair would be fitting the eval to itself, which is exactly what the roadmap's "don't tune against guesses, tune against the eval set" principle (Phase 2, dataset section) warns against -- there's no eval set yet, so there's nothing legitimate to tune against.
+
+**What this means in practice for now:** treat elbow/shoulder issues as more trustworthy than hip/knee issues until either 3D pose exists or there's a real multi-clip eval set to check hip-angle reliability against. Don't hide this by suppressing hip issues outright -- that would substitute a different unvalidated guess for the current one.
+
 ## Tracker and pose libraries: integrate, don't reimplement
 
 **Decision:** use `ultralytics`'s built-in `.track()` (which already bundles YOLO detection with a ByteTrack/BoT-SORT tracker) instead of hand-rolling ByteTrack, and use `rtmlib` (RTMPose over onnxruntime) instead of installing the full OpenMMLab stack (`mmcv`/`mmdet`/`mmpose`).
