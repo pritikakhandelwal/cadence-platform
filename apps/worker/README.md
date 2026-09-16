@@ -15,7 +15,7 @@ arq worker.settings.WorkerSettings
 
 First run downloads YOLO and RTMPose weights (a few hundred MB) — needs internet once, then they're cached.
 
-**Known issue:** this is currently slow -- ~48 minutes for a few seconds of solo dance footage on CPU in initial testing. `pose.py`'s use of `rtmlib`'s `Body` runs its own internal person detector per cropped frame on top of the YOLO detection `detection.py` already did for tracking -- two detectors per frame instead of one. Worth fixing (likely: find `rtmlib`'s bbox-conditioned pose-only entry point, or reconsider `Body` as the entry point) before this touches a real upload. See `STATUS.md`.
+Performance: the full pipeline (detect + track + lock + pose) runs a 432-frame solo clip in ~76 seconds on CPU (~33ms/frame for pose itself). Earlier versions used `rtmlib`'s `Body`, which runs its own internal person detector per frame on top of the YOLO detection `detection.py` already does for tracking — two detectors per frame instead of one, and ~48 minutes for the same clip. `pose.py` now calls `rtmlib.RTMPose` directly with our own bbox instead. See `STATUS.md` for the full history if this regresses.
 
 ## Test
 

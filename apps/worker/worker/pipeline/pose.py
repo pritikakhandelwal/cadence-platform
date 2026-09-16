@@ -1,14 +1,25 @@
 """Pose estimation on a crop, using RTMPose via rtmlib.
 
-Roadmap Phase 2: "Pose on crop only (RTMPose-m default)". We already
-have a person bbox from YOLO+ByteTrack (detection.py); rather than
-depend on rtmlib's exact low-level bbox-conditioned API (which we
-can't verify offline against docs), we crop the frame to that bbox
-ourselves with a plain numpy slice and hand rtmlib *only that crop*.
-This still satisfies "pose on crop only" literally -- the pose model
-never sees a second person or the background outside the bbox -- while
-only depending on rtmlib's simplest, best-documented entry point:
-`Body(image) -> (keypoints, scores)`.
+Roadmap Phase 2: "Pose on crop only (RTMPose-m default)".
+
+First version of this file fed a pre-cropped image into rtmlib's high-
+level `Body` helper, which bundles its *own* internal YOLOX person
+detector -- so every frame ran two detectors (our YOLO+ByteTrack one in
+detection.py, then Body's YOLOX one again) even though we already knew
+exactly where the person was. That's why the first integration run took
+~48 minutes for a few seconds of footage (see STATUS.md's Phase 2
+section for that history).
+
+Fix: call rtmlib's low-level `RTMPose` model directly with our own
+bbox. `RTMPose.__call__(image, bboxes=[bbox])` takes the *full* frame
+and does its own affine crop internally per bbox (with sensible
+padding) -- it never looks outside that bbox, so "pose on crop only"
+still holds, but there's exactly one model doing inference per frame
+instead of two. We resolve the actual RTMPose-m onnx weights via
+rtmlib's own `Body.MODE` registry rather than hardcoding a model URL
+ourselves -- that registry is the thing that knows which checkpoint
+goes with which `mode`, and hardcoding our own copy of it would drift
+the moment rtmlib updates its model zoo.
 """
 
 from __future__ import annotations
@@ -17,45 +28,34 @@ import numpy as np
 
 
 class PoseEstimator:
-    """Wraps rtmlib's Body (RTMDet-person + RTMPose) model. One instance
-    per process -- the underlying onnxruntime session is expensive to
-    create and safe to reuse across frames."""
+    """Wraps rtmlib's RTMPose model directly (no internal detector).
+    One instance per process -- the underlying onnxruntime session is
+    expensive to create and safe to reuse across frames."""
 
     def __init__(self, mode: str = "balanced", backend: str = "onnxruntime", device: str = "cpu"):
-        from rtmlib import Body
+        from rtmlib import RTMPose
+        from rtmlib.tools.solution.body import Body
 
-        self._body = Body(to_openpose=False, mode=mode, backend=backend, device=device)
+        pose_url = Body.MODE[mode]["pose"]
+        pose_input_size = Body.MODE[mode]["pose_input_size"]
+        self._pose_model = RTMPose(
+            pose_url,
+            model_input_size=pose_input_size,
+            to_openpose=False,
+            backend=backend,
+            device=device,
+        )
 
     def estimate(
         self, frame_bgr: np.ndarray, bbox: tuple[float, float, float, float]
     ) -> tuple[np.ndarray, np.ndarray]:
-        """Run pose estimation on the region of `frame_bgr` inside
-        `bbox` (x1, y1, x2, y2). Returns (keypoints, scores) in the
-        *original frame's* coordinate space -- (num_joints, 2) and
-        (num_joints,) -- for the most confident person found in the
-        crop (there should only be one, since we cropped to one
-        person's bbox already).
-
-        Returns all-zero keypoints/scores if no person is found in the
-        crop (e.g. the bbox was mostly motion-blur).
+        """Run pose estimation for the person inside `bbox` (x1, y1, x2,
+        y2) of `frame_bgr`. Returns (keypoints, scores) already in the
+        original frame's coordinate space -- (num_joints, 2) and
+        (num_joints,) -- since RTMPose's own postprocessing maps its
+        internal crop-space prediction back to the coordinates of
+        whatever image it was given.
         """
 
-        x1, y1, x2, y2 = (int(round(v)) for v in bbox)
-        crop = frame_bgr[y1:y2, x1:x2]
-        if crop.size == 0:
-            return np.zeros((17, 2)), np.zeros(17)
-
-        keypoints, scores = self._body(crop)
-        if keypoints is None or len(keypoints) == 0:
-            return np.zeros((17, 2)), np.zeros(17)
-
-        # Body can return multiple detections even inside a single-person
-        # crop (e.g. a reflection); keep the one with highest mean score.
-        best_idx = int(np.argmax(scores.mean(axis=1)))
-        best_keypoints = keypoints[best_idx].astype(float)
-        best_scores = scores[best_idx].astype(float)
-
-        best_keypoints[:, 0] += x1
-        best_keypoints[:, 1] += y1
-
-        return best_keypoints, best_scores
+        keypoints, scores = self._pose_model(frame_bgr, bboxes=[list(bbox)])
+        return keypoints[0].astype(float), scores[0].astype(float)
