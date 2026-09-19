@@ -1,26 +1,71 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --page-bg: #f8f5fe;
+  --ink: #17161c;
+  --muted: #6b6874;
+  --muted-2: #a99fc9;
+  --border: #ded7f5;
+  --border-soft: #ede7f9;
+  --accent: #7b64d9;
+  --accent-tint: #f1ecfb;
+  --sky: #7fb8e0;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-page: var(--page-bg);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-muted-2: var(--muted-2);
+  --color-border: var(--border);
+  --color-border-soft: var(--border-soft);
+  --color-accent: var(--accent);
+  --color-accent-tint: var(--accent-tint);
+  --color-sky: var(--sky);
+  --font-serif: var(--font-fraunces);
+  --font-sans: var(--font-sora);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--page-bg);
+  color: var(--ink);
+  font-family: var(--font-sora), system-ui, sans-serif;
+}
+
+@keyframes cadence-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  50% {
+    transform: scale(1.12);
+    opacity: 0.9;
+  }
+}
+
+@keyframes cadence-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.cadence-ring {
+  animation: cadence-pulse 2.6s ease-in-out infinite;
+}
+
+.cadence-ring-delay {
+  animation-delay: 0.5s;
+}
+
+.cadence-spark {
+  animation: cadence-spin 6s linear infinite;
+}
+
+.cadence-dotgrid {
+  background-image: radial-gradient(circle, #e7dffa 1.5px, transparent 1.5px);
+  background-size: 28px 28px;
 }

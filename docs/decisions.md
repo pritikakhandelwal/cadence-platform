@@ -83,6 +83,22 @@ Legacy app runs MediaPipe on the full frame. This breaks on multi-person shots, 
 
 **What this means in practice for now:** treat elbow/shoulder issues as more trustworthy than hip/knee issues until either 3D pose exists or there's a real multi-clip eval set to check hip-angle reliability against. Don't hide this by suppressing hip issues outright -- that would substitute a different unvalidated guess for the current one.
 
+## Wiring `apps/web` to `apps/api`: a `file:` dependency, not npm workspaces
+
+**Ask (implicit):** `apps/web`'s own README said `@cadence/schema` "gets wired in via npm workspaces once this app starts calling the real API" -- that point arrived this session.
+
+**Decision:** added `"@cadence/schema": "file:../../packages/schema/typescript"` directly to `apps/web/package.json`, plus `transpilePackages: ["@cadence/schema"]` in `next.config.ts` (needed because the schema package ships raw `.ts` source with no build step, and Next's compiler skips `node_modules` by default). Did **not** add a root-level `package.json` with npm workspaces, despite that being what the README described.
+
+**Why:** `.github/workflows/ci.yml` currently installs `apps/web` and `packages/schema/typescript` as two fully independent npm projects (`working-directory` + plain `npm install` in each). A root workspace would change that installation topology for both CI jobs, for a benefit (workspace-aware installs) this particular task didn't need -- importing one package's types. A `file:` dependency gets the same real linkage (a symlink in `apps/web/node_modules`) with a one-line change and zero effect on how CI already installs the other two packages. Worth revisiting if a third package needs the same treatment and the duplication starts to hurt.
+
+## Auth is cookie-only; `apps/web` needed CORS added to `apps/api`, not a token store
+
+**Found:** `apps/api`'s auth (`POST /auth/login`) sets an httponly session cookie and has no bearer-token path at all -- confirmed by reading `apps/api/app/deps.py` and `routers/auth.py` before writing any frontend code, rather than assuming a token existed. `apps/api/app/main.py` also had no CORS middleware at all, which silently doesn't matter until a browser on a different origin (`apps/web` on :3000) tries to call it.
+
+**Decision:** added `CORSMiddleware` to `apps/api/app/main.py` with an explicit `allow_origins=["http://localhost:3000"]` and `allow_credentials=True`, and made every `apps/web` fetch call send `credentials: "include"`. Did not add any client-side token storage.
+
+**Why the explicit origin, not `"*"`:** the fetch spec forbids combining a wildcard origin with credentialed requests -- `allow_origins=["*"]` plus `allow_credentials=True` fails silently (the browser just refuses to expose the response), so this had to be an explicit list from the start. This is a real thing to revisit before any real deployment: the allowed origin is hardcoded, not read from an env var, which is fine for local dev and wrong for anything else -- see `apps/web/README.md`'s "What's not real yet."
+
 ## Tracker and pose libraries: integrate, don't reimplement
 
 **Decision:** use `ultralytics`'s built-in `.track()` (which already bundles YOLO detection with a ByteTrack/BoT-SORT tracker) instead of hand-rolling ByteTrack, and use `rtmlib` (RTMPose over onnxruntime) instead of installing the full OpenMMLab stack (`mmcv`/`mmdet`/`mmpose`).
