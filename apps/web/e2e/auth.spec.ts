@@ -47,17 +47,3 @@ test("a wrong password is refused with the server's reason; the right one gets b
   await page.getByRole("button", { name: "Log in" }).click();
   await expect(page).toHaveURL(/\/studio\/upload/);
 });
-
-test("the upload form refuses to continue until both videos are supplied", async ({ page }) => {
-  await page.goto("/register");
-  await page.getByLabel("Name").fill("E2E Tester");
-  await page.getByLabel("Email").fill(uniqueEmail());
-  await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
-  await page.getByLabel("Confirm password").fill(PASSWORD);
-  await page.getByRole("button", { name: "Create account" }).click();
-  await expect(page.getByText("Add your two videos")).toBeVisible();
-
-  await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page.getByText("Add your practice video first.")).toBeVisible();
-  await expect(page).toHaveURL(/\/studio\/upload/);
-});

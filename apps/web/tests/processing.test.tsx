@@ -131,4 +131,18 @@ describe("ProcessingClient", () => {
     await flush(2500);
     expect(mocks.router.replace).toHaveBeenCalledWith("/studio/results/abc");
   });
+
+  it("stops promising it'll be quick once it has been waiting a few minutes", async () => {
+    mocks.getAnalysis.mockResolvedValue(makeAnalysis("running"));
+
+    render(<ProcessingClient id="abc" />);
+    await flush();
+    expect(screen.getByText("This usually takes under a minute.")).toBeInTheDocument();
+
+    await flush(3 * 60_000);
+    expect(screen.getByText(/taking longer than usual/i)).toBeInTheDocument();
+    expect(screen.queryByText("This usually takes under a minute.")).not.toBeInTheDocument();
+    // still polling -- it's a hint, not a give-up
+    expect(mocks.router.replace).not.toHaveBeenCalled();
+  });
 });

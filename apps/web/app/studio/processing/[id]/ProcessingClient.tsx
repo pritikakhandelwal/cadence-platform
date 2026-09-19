@@ -6,10 +6,13 @@ import { Logo } from "@/components/Logo";
 import { getAnalysis, ApiError } from "@/lib/api";
 
 const POLL_INTERVAL_MS = 2500;
+// After this long, stop claiming it "usually takes under a minute".
+const SLOW_AFTER_MS = 3 * 60_000;
 
 export function ProcessingClient({ id }: { id: string }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const [slow, setSlow] = useState(false);
   const redirected = useRef(false);
 
   useEffect(() => {
@@ -45,9 +48,11 @@ export function ProcessingClient({ id }: { id: string }) {
 
     poll();
     const interval = setInterval(poll, POLL_INTERVAL_MS);
+    const slowTimer = setTimeout(() => setSlow(true), SLOW_AFTER_MS);
     return () => {
       cancelled = true;
       clearInterval(interval);
+      clearTimeout(slowTimer);
     };
   }, [id, router]);
 
@@ -76,7 +81,11 @@ export function ProcessingClient({ id }: { id: string }) {
         {error ? (
           <div className="text-sm text-[#B0453D] bg-page px-4 py-0.5 rounded-lg">{error}</div>
         ) : (
-          <div className="text-sm text-muted bg-page px-4 py-0.5 rounded-lg">This usually takes under a minute.</div>
+          <div className="text-sm text-muted bg-page px-4 py-0.5 rounded-lg text-center max-w-sm">
+            {slow
+              ? "This is taking longer than usual. Longer videos can take several minutes -- you can leave this page open."
+              : "This usually takes under a minute."}
+          </div>
         )}
         <a
           href="/studio/upload"

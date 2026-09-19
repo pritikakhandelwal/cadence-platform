@@ -1,5 +1,6 @@
 import path from "node:path";
 import { expect, test } from "@playwright/test";
+import { openUpload } from "./helpers";
 
 const USER_VIDEO = process.env.CADENCE_E2E_USER_VIDEO;
 const REFERENCE_VIDEO = process.env.CADENCE_E2E_REFERENCE_VIDEO;
@@ -10,13 +11,7 @@ test.skip(
 );
 
 test("upload two real clips through the real form and watch a real result appear", async ({ page }) => {
-  await page.goto("/register");
-  await page.getByLabel("Name").fill("E2E Tester");
-  await page.getByLabel("Email").fill(`e2e-${Date.now()}@example.com`);
-  await page.getByLabel("Password", { exact: true }).fill("correct-horse-battery");
-  await page.getByLabel("Confirm password").fill("correct-horse-battery");
-  await page.getByRole("button", { name: "Create account" }).click();
-  await expect(page.getByText("Add your two videos")).toBeVisible();
+  await openUpload(page);
 
   // The real <input type="file"> elements -- the part no other check could drive.
   const inputs = page.locator('input[type="file"]');
