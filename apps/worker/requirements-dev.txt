@@ -9,3 +9,4 @@ arq>=0.26
 numpy>=1.26
 pytest>=8.0
 -e ../../packages/schema/python
+-e ../../packages/db

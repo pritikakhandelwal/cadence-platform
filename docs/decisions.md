@@ -99,6 +99,14 @@ Legacy app runs MediaPipe on the full frame. This breaks on multi-person shots, 
 
 **Why the explicit origin, not `"*"`:** the fetch spec forbids combining a wildcard origin with credentialed requests -- `allow_origins=["*"]` plus `allow_credentials=True` fails silently (the browser just refuses to expose the response), so this had to be an explicit list from the start. This is a real thing to revisit before any real deployment: the allowed origin is hardcoded, not read from an env var, which is fine for local dev and wrong for anything else -- see `apps/web/README.md`'s "What's not real yet."
 
+## A crashed analysis is recorded as `rejected`, not left `queued`
+
+**Found:** reading `apps/worker/worker/tasks.py` while writing end-to-end tests for the unhappy paths: neither job had any exception handling. If detection, pose extraction or scoring threw (a video `ffprobe` accepts but OpenCV can't decode, an ML error, a bad reference clip), arq marked the *job* failed but the *analysis row* stayed `queued` forever -- and the UI polled it forever, telling the person it "usually takes under a minute." Reproduced deterministically with a fake pipeline (`apps/worker/tests/test_task_failures.py`; 4 of its 5 tests fail on the old code).
+
+**Decision:** both jobs now catch `Exception`, log the traceback, and write a terminal result to the row -- status `rejected`, reason "Something went wrong on our side while analyzing this video. Please try again." The frontend already turns `rejected` into a dismissible notice and a way back to upload, so no frontend change was needed for the crash path itself. Separately, the processing page now stops promising "under a minute" after 3 minutes (`apps/web`), because a *dead* worker (as opposed to a crashing job) still leaves a row stuck.
+
+**The tradeoff, stated plainly:** `rejected` means "your input was bad," and this isn't that -- it's our fault, and the message says so. A distinct `failed` status would be cleaner (the UI could offer "retry" rather than "fix your video," and metrics could separate infrastructure failures from bad uploads), but it would change the frozen `AnalysisResult` contract in both `packages/schema` languages and every consumer, which wasn't warranted for this fix. Worth revisiting if failures need different handling or reporting. Not covered: a worker that dies or is killed mid-job never reaches this code, so that row still stays `queued`.
+
 ## Tracker and pose libraries: integrate, don't reimplement
 
 **Decision:** use `ultralytics`'s built-in `.track()` (which already bundles YOLO detection with a ByteTrack/BoT-SORT tracker) instead of hand-rolling ByteTrack, and use `rtmlib` (RTMPose over onnxruntime) instead of installing the full OpenMMLab stack (`mmcv`/`mmdet`/`mmpose`).

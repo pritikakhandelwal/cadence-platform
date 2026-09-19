@@ -10,11 +10,14 @@ PostgreSQL" architecture.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import asdict
 from datetime import datetime, timezone
 from typing import Any
 
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 
 async def echo(ctx: dict[str, Any], message: str) -> str:
@@ -45,41 +48,75 @@ async def detect_tracks_job(ctx: dict[str, Any], analysis_id: str, video_path: s
         if analysis is None:
             return {"error": "analysis_not_found", "analysis_id": analysis_id}
 
-        summary, detections = detect_tracks(video_path)
+        try:
+            summary, detections = detect_tracks(video_path)
 
-        if not summary.tracks:
-            _finish(
-                analysis,
-                AnalysisStatus.rejected,
-                TrackingInfo(confidence=0, reliable_frame_pct=0, person_count=0),
-                QualityGate(passed=False, reasons=["No person detected in this clip."]),
-            )
-        elif is_lock_ambiguous(summary.tracks):
-            analysis.status = AnalysisStatus.needs_dancer_pick.value
-            analysis.pending_lock_data = {
-                "detections": [asdict(d) for d in detections],
-                "fps": summary.fps,
-                "total_frames": summary.total_frames,
-                "tracks": [
-                    {
-                        "track_id": t.track_id,
-                        "frame_count": t.frame_count,
-                        "mean_confidence": t.mean_confidence,
-                        "fragments": t.fragments,
-                    }
-                    for t in summary.tracks
-                ],
-            }
-        else:
-            track_id = summary.tracks[0].track_id
-            locked = extract_locked_pose(video_path, detections, track_id, summary.fps, summary.total_frames)
-            _finish_lock(analysis, locked, track_id)
+            if not summary.tracks:
+                _finish(
+                    analysis,
+                    AnalysisStatus.rejected,
+                    TrackingInfo(confidence=0, reliable_frame_pct=0, person_count=0),
+                    QualityGate(passed=False, reasons=["No person detected in this clip."]),
+                )
+            elif is_lock_ambiguous(summary.tracks):
+                analysis.status = AnalysisStatus.needs_dancer_pick.value
+                analysis.pending_lock_data = {
+                    "detections": [asdict(d) for d in detections],
+                    "fps": summary.fps,
+                    "total_frames": summary.total_frames,
+                    "tracks": [
+                        {
+                            "track_id": t.track_id,
+                            "frame_count": t.frame_count,
+                            "mean_confidence": t.mean_confidence,
+                            "fragments": t.fragments,
+                        }
+                        for t in summary.tracks
+                    ],
+                }
+            else:
+                track_id = summary.tracks[0].track_id
+                locked = extract_locked_pose(video_path, detections, track_id, summary.fps, summary.total_frames)
+                _finish_lock(analysis, locked, track_id)
+        except Exception:
+            _record_internal_failure(db, analysis, analysis_id)
 
         analysis.updated_at = datetime.now(timezone.utc)
         db.commit()
         return {"analysis_id": analysis_id, "status": analysis.status}
     finally:
         db.close()
+
+
+def _record_internal_failure(db, analysis, analysis_id: str) -> None:
+    """Called from inside an `except` block. Without this, an exception in
+    the pipeline (a video ffprobe accepts but OpenCV can't decode, an ML
+    error, a bad reference clip) made arq mark the job failed while the
+    analysis row stayed `queued` forever -- and the UI polled it forever,
+    telling the person it "usually takes under a minute".
+
+    The row is the source of truth (see the module docstring), so the
+    failure is written there -- as `rejected`, the one terminal state the
+    frontend already turns into "here's why, try again" -- with a reason
+    that's honest that it was our fault, not theirs. The traceback is
+    logged, not swallowed. A dedicated `failed` status would be cleaner
+    (see docs/decisions.md), but changes the frozen AnalysisResult contract.
+    """
+
+    from cadence_schema import AnalysisStatus, QualityGate, TrackingInfo
+
+    logger.exception("analysis %s failed while processing", analysis_id)
+    db.rollback()
+    analysis.pending_lock_data = None
+    _finish(
+        analysis,
+        AnalysisStatus.rejected,
+        TrackingInfo(confidence=0, reliable_frame_pct=0, person_count=0),
+        QualityGate(
+            passed=False,
+            reasons=["Something went wrong on our side while analyzing this video. Please try again."],
+        ),
+    )
 
 
 def _finish(analysis, status, tracking, quality_gate, overall=None, segments=None) -> None:
@@ -259,8 +296,11 @@ async def extract_locked_pose_job(
             for d in detections
         ]
 
-        locked = extract_locked_pose(video_path, detection_objs, track_id, fps, total_frames)
-        _finish_lock(analysis, locked, track_id)
+        try:
+            locked = extract_locked_pose(video_path, detection_objs, track_id, fps, total_frames)
+            _finish_lock(analysis, locked, track_id)
+        except Exception:
+            _record_internal_failure(db, analysis, analysis_id)
 
         analysis.pending_lock_data = None
         analysis.updated_at = datetime.now(timezone.utc)
