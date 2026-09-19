@@ -87,6 +87,8 @@ jobs:
       - working-directory: apps/web
         run: npm run lint
       - working-directory: apps/web
+        run: npm test
+      - working-directory: apps/web
         run: npm run build
 
   legacy-streamlit:
