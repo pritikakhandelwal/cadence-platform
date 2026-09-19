@@ -35,6 +35,7 @@ if not _SAMPLE_VIDEO.is_file():
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 from eval_planted_errors import ISSUE_THRESHOLD_DEG, TARGET_HIT_RATE, apply_joint_offset, corrupt_sequence  # noqa: E402
+from eval_planted_signals import _energy_case, _score, _tempo_case  # noqa: E402
 
 
 @pytest.fixture(scope="module")
@@ -120,3 +121,37 @@ def test_self_comparison_of_real_motion_scores_near_100(real_pose_sequence):
         reference_scores=scores, user_scores=scores,
     )
     assert result.overall_score > 99.0
+
+
+def _as_reference(locked):
+    import numpy as np
+
+    return (np.array(locked.keypoints), np.array(locked.scores), list(locked.frame_indices), locked.fps)
+
+
+# The next three guard the fixes for the false positives the tempo/energy/
+# balance types showed the first time they ran on real footage (see
+# apps/worker/README.md). The user side runs at HALF the reference's frame
+# rate -- the mismatch that caused them. Fuller sweep: scripts/eval_planted_signals.py.
+
+
+def test_planted_skip_and_repeat_are_detected_at_a_mismatched_frame_rate(real_pose_sequence):
+    ref = _as_reference(real_pose_sequence)
+    start = len(ref[0]) / ref[3] * 0.25
+    for kind, dur in (("skip", 2.0), ("repeat", 2.4)):
+        detected, false_positives, _ = _tempo_case(ref, kind, start, dur, 2)
+        assert detected, f"planted {kind} of {dur}s wasn't flagged as tempo"
+        assert false_positives == 0, f"{kind}: tempo flagged in windows far from the edit"
+
+
+def test_heavily_damped_motion_is_flagged_as_low_energy_at_a_mismatched_frame_rate(real_pose_sequence):
+    ref = _as_reference(real_pose_sequence)
+    flagged, total = _energy_case(ref, 0.15, 2)
+    assert flagged >= total // 2
+
+
+def test_unedited_copy_at_half_frame_rate_raises_no_tempo_or_energy_issue(real_pose_sequence):
+    ref = _as_reference(real_pose_sequence)
+    result = _score(ref, (ref[0], ref[1]), 2)
+    types = {i.type for s in result.segments for i in s.issues}
+    assert not types & {"tempo", "energy", "balance"}
