@@ -115,7 +115,7 @@ Legacy app runs MediaPipe on the full frame. This breaks on multi-person shots, 
 
 **2. JSON null.** Explicitly setting `result` or `pending_lock_data` to `None` stored the JSON literal `null`, not SQL `NULL`, on both SQLite and Postgres. The application treats both as empty so nothing broke, but it contradicted the `Analysis` docstring ("NULL while queued") and any `WHERE pending_lock_data IS NOT NULL` query (e.g. finding analyses awaiting a dancer pick) would have returned finished ones. **Decision:** `JSON(none_as_null=True)`; no DDL change. Guarded by `tests/test_json_null.py`.
 
-**CI:** the API job now also runs the suite against a Postgres service container whose server is set to a non-UTC zone (`CADENCE_TEST_DATABASE_URL`), so the timezone test has teeth there. That workflow change is unverified -- it parses as YAML, but it hasn't run on GitHub Actions.
+**CI:** the API job now also runs the suite against a Postgres service container whose server is set to a non-UTC zone (`CADENCE_TEST_DATABASE_URL`), so the timezone test has teeth there. That workflow change is verified: on GitHub Actions the SQLite step and the Postgres step each ran all 63 tests and passed, after the server was switched to `Asia/Kolkata`.
 
 ## Alembic migrations next to `create_all`, with a test that keeps them identical
 
