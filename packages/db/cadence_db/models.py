@@ -1,6 +1,14 @@
 """Persisted rows. Kept dialect-agnostic (String/DateTime/JSON, no
 Postgres-only types) so the same models work against SQLite in tests
 and Postgres in production.
+
+Every DateTime is `timezone=True` (TIMESTAMPTZ on Postgres). Without it,
+Postgres converts the timezone-aware UTC values this code writes using the
+*server session's* time zone before dropping the offset, so on any server not
+set to UTC, session expiry and login lockouts were stored hours off (found by
+running the API suite against a real Postgres set to UTC+5:30; see
+apps/api/tests/test_datetime_roundtrip.py). SQLite ignores the flag and keeps
+returning naive UTC, which the auth code already treats as UTC.
 """
 
 from __future__ import annotations
@@ -29,7 +37,7 @@ class User(Base):
     name: Mapped[str] = mapped_column(String(100))
     email: Mapped[str] = mapped_column(String(254), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255))
-    joined_on: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    joined_on: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 
 class LoginSecurity(Base):
@@ -40,8 +48,8 @@ class LoginSecurity(Base):
 
     email: Mapped[str] = mapped_column(String(254), primary_key=True)
     failed_attempts: Mapped[int] = mapped_column(Integer, default=0)
-    locked_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 
 class UserSession(Base):
@@ -49,8 +57,8 @@ class UserSession(Base):
 
     token: Mapped[str] = mapped_column(String(64), primary_key=True)
     user_id: Mapped[str] = mapped_column(String(32), ForeignKey("users.id"))
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
-    expires_at: Mapped[datetime] = mapped_column(DateTime)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
     user: Mapped["User"] = relationship()
 
@@ -78,7 +86,7 @@ class Analysis(Base):
     user_id: Mapped[str] = mapped_column(String(32), ForeignKey("users.id"))
     workspace_id: Mapped[str] = mapped_column(String(32))
     status: Mapped[str] = mapped_column(String(32), default="queued")
-    result: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    pending_lock_data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    result: Mapped[dict | None] = mapped_column(JSON(none_as_null=True), nullable=True)
+    pending_lock_data: Mapped[dict | None] = mapped_column(JSON(none_as_null=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)

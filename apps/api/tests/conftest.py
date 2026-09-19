@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import subprocess
 
 import pytest
@@ -14,6 +15,23 @@ from app.queue import get_queue
 
 @pytest.fixture()
 def db_engine(tmp_path):
+    """SQLite by default. Set CADENCE_TEST_DATABASE_URL (e.g.
+    postgresql+psycopg2://user:pass@localhost/dbname) to run the whole suite
+    against another database -- the models are meant to be dialect-agnostic,
+    and this is how that claim gets checked against a real Postgres. The
+    schema is dropped and recreated around every test, so point it at a
+    database you don't care about."""
+
+    url = os.getenv("CADENCE_TEST_DATABASE_URL")
+    if url:
+        engine = create_engine(url)
+        Base.metadata.drop_all(bind=engine)
+        Base.metadata.create_all(bind=engine)
+        yield engine
+        Base.metadata.drop_all(bind=engine)
+        engine.dispose()
+        return
+
     db_path = tmp_path / "test.db"
     engine = create_engine(f"sqlite:///{db_path}", connect_args={"check_same_thread": False})
     Base.metadata.create_all(bind=engine)

@@ -49,6 +49,22 @@ jobs:
 
   api:
     runs-on: ubuntu-latest
+    # A real Postgres, so the "dialect-agnostic" models are actually checked
+    # against one -- not just SQLite.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: cadence
+          POSTGRES_PASSWORD: cadence
+          POSTGRES_DB: cadence_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cadence -d cadence_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -57,7 +73,19 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - working-directory: apps/api
         run: pip install -r requirements.txt
-      - working-directory: apps/api
+      - name: pytest (SQLite)
+        working-directory: apps/api
+        run: pytest
+      # The image defaults to UTC, which would hide time-zone bugs (session
+      # expiry and lockouts were once stored hours off on a non-UTC server --
+      # see apps/api/tests/test_datetime_roundtrip.py). Make the server
+      # non-UTC so that test has teeth.
+      - name: Make the Postgres server non-UTC
+        run: PGPASSWORD=cadence psql -h localhost -U cadence -d cadence_test -c "ALTER DATABASE cadence_test SET timezone = 'Asia/Kolkata'"
+      - name: pytest (Postgres)
+        working-directory: apps/api
+        env:
+          CADENCE_TEST_DATABASE_URL: postgresql+psycopg2://cadence:cadence@localhost:5432/cadence_test
         run: pytest
 
   worker:

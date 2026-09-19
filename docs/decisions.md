@@ -107,6 +107,16 @@ Legacy app runs MediaPipe on the full frame. This breaks on multi-person shots, 
 
 **The tradeoff, stated plainly:** `rejected` means "your input was bad," and this isn't that -- it's our fault, and the message says so. A distinct `failed` status would be cleaner (the UI could offer "retry" rather than "fix your video," and metrics could separate infrastructure failures from bad uploads), but it would change the frozen `AnalysisResult` contract in both `packages/schema` languages and every consumer, which wasn't warranted for this fix. Worth revisiting if failures need different handling or reporting. Not covered: a worker that dies or is killed mid-job never reaches this code, so that row still stays `queued`.
 
+## Timezone-aware datetime columns, and SQL NULL (not JSON `null`) for empty JSON
+
+**Found:** by running the API suite and then the browser suite against a real Postgres 16 (no Docker here, so via the self-contained `pgserver` pip package) -- neither showed up on SQLite.
+
+**1. Datetimes.** Every `DateTime` column was timezone-naive, but the code writes timezone-aware UTC values and reads naive ones back as UTC. On Postgres, an aware value going into `TIMESTAMP WITHOUT TIME ZONE` is first converted using the *server session's* time zone, then the offset is dropped -- so on a server not set to UTC the stored value is wrong, and the read path ("assume UTC") silently propagates it. Reproduced: on a UTC+5:30 server, session expiry and lockout end came back **5h30m off** (`tests/test_datetime_roundtrip.py`). It hid because most Postgres servers default to UTC. **Decision:** every `DateTime` is `timezone=True` (TIMESTAMPTZ on Postgres; SQLite ignores the flag and still returns naive UTC, which the auth code already treats as UTC). No migration path was written because no Postgres database is known to exist yet -- one created earlier would need `ALTER COLUMN ... TYPE timestamptz` (with the right `USING` for its server's zone). My first pass at this changed six of seven columns and missed `expires_at` (its declaration had no trailing comma for my find-and-replace to match); the test caught it, which is the reason to keep it.
+
+**2. JSON null.** Explicitly setting `result` or `pending_lock_data` to `None` stored the JSON literal `null`, not SQL `NULL`, on both SQLite and Postgres. The application treats both as empty so nothing broke, but it contradicted the `Analysis` docstring ("NULL while queued") and any `WHERE pending_lock_data IS NOT NULL` query (e.g. finding analyses awaiting a dancer pick) would have returned finished ones. **Decision:** `JSON(none_as_null=True)`; no DDL change. Guarded by `tests/test_json_null.py`.
+
+**CI:** the API job now also runs the suite against a Postgres service container whose server is set to a non-UTC zone (`CADENCE_TEST_DATABASE_URL`), so the timezone test has teeth there. That workflow change is unverified -- it parses as YAML, but it hasn't run on GitHub Actions.
+
 ## Tracker and pose libraries: integrate, don't reimplement
 
 **Decision:** use `ultralytics`'s built-in `.track()` (which already bundles YOLO detection with a ByteTrack/BoT-SORT tracker) instead of hand-rolling ByteTrack, and use `rtmlib` (RTMPose over onnxruntime) instead of installing the full OpenMMLab stack (`mmcv`/`mmdet`/`mmpose`).
