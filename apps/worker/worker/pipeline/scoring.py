@@ -59,7 +59,18 @@ OCCLUSION_FRACTION_THRESHOLD = 0.3
 TEMPO_LOW_RATIO = 0.6
 TEMPO_HIGH_RATIO = 1.6
 ENERGY_RATIO_THRESHOLD = 0.5
-MIN_REFERENCE_ENERGY_DEG = 1.5
+# Energy is measured as mean joint-angle change over a fixed real-time
+# lag, not per frame: the reference and user clips are usually different
+# frame rates (60 vs 30 fps on the first real clip pair), and a per-frame
+# difference changes with fps -- and simply scaling by fps doesn't fix it
+# either, since jitter and rough motion don't scale linearly with frame
+# spacing. Comparing displacement over the same physical interval does.
+# The threshold (2.5 deg over 0.1s, ~25 deg/s) only marks "the reference
+# is nearly still here"; it's a first-pass default, not tuned -- and not
+# a mechanical conversion of the old per-frame 1.5, since rough motion
+# doesn't scale linearly with the lag.
+ENERGY_LAG_SECONDS = 0.1
+MIN_REFERENCE_ENERGY_DEG = 2.5
 BALANCE_ISSUE_THRESHOLD = 0.15
 DEFAULT_SEGMENT_SECONDS = 2.0
 # score = 100 * exp(-mean_abs_angle_error_deg / SCORE_TAU); solved so a
@@ -156,7 +167,27 @@ def _angle_issues(mean_abs_diff: np.ndarray, excluded: set[str]) -> list[ScoredI
     return issues
 
 
-def _balance_issue(mean_abs_diff: np.ndarray) -> ScoredIssue | None:
+def _balance_issue(
+    mean_abs_diff: np.ndarray,
+    reference_nan_mask: np.ndarray,
+    ref_indices: list[int],
+    user_nan_mask: np.ndarray,
+    other_indices: list[int],
+) -> ScoredIssue | None:
+    # Same trust rule as `occlusion`: balance_offset depends on both
+    # ankles, and on real clips framed above the feet they clear the
+    # confidence bar in only ~30-60% of frames (mean confidence right at
+    # the 0.3 threshold). A "wobble" computed from a few marginal ankle
+    # estimates is noise, so say nothing rather than report it -- on the
+    # first real clip pair this gate is what removed two large
+    # (0.6-0.7 hip-width) balance flags built on such ankles.
+    missing = max(
+        float(np.mean(reference_nan_mask[ref_indices, _BALANCE_INDEX])),
+        float(np.mean(user_nan_mask[other_indices, _BALANCE_INDEX])),
+    )
+    if missing >= OCCLUSION_FRACTION_THRESHOLD:
+        return None
+
     diff = mean_abs_diff[_BALANCE_INDEX]
     if np.isnan(diff) or diff < BALANCE_ISSUE_THRESHOLD:
         return None
@@ -194,7 +225,9 @@ def _occlusion_issues(user_nan_mask: np.ndarray, other_indices: list[int]) -> tu
     return issues, excluded
 
 
-def _tempo_issue(ref_indices: list[int], other_indices: list[int]) -> ScoredIssue | None:
+def _tempo_issue(
+    ref_frames: list[int], ref_fps: float, other_frames: list[int], other_fps: float
+) -> ScoredIssue | None:
     """Roadmap-adjacent, not validated against real footage (see
     module docstring): a proxy for "a move was skipped/rushed" or
     "added/repeated", from how much the DTW path locally stretches or
@@ -204,11 +237,15 @@ def _tempo_issue(ref_indices: list[int], other_indices: list[int]) -> ScoredIssu
     move); much larger suggests extra frames with no reference
     counterpart (an added or repeated move)."""
 
-    ref_span = ref_indices[-1] - ref_indices[0] + 1
-    user_span = max(other_indices) - min(other_indices) + 1
-    if ref_span <= 0:
+    # Compare durations in seconds, not frame counts: comparing raw
+    # frame spans made a 60 fps reference vs. a 30 fps user clip read as
+    # "half the frames" in every window (a false tempo issue everywhere,
+    # found the first time this ran on real footage).
+    ref_seconds = (max(ref_frames) - min(ref_frames) + 1) / ref_fps
+    user_seconds = (max(other_frames) - min(other_frames) + 1) / other_fps
+    if ref_seconds <= 0:
         return None
-    ratio = user_span / ref_span
+    ratio = user_seconds / ref_seconds
 
     if TEMPO_LOW_RATIO <= ratio <= TEMPO_HIGH_RATIO:
         return None
@@ -220,26 +257,42 @@ def _tempo_issue(ref_indices: list[int], other_indices: list[int]) -> ScoredIssu
     return ScoredIssue(joint="overall", type="tempo", magnitude=round(abs(ratio - 1), 2), message=message)
 
 
-def _segment_energy(features: np.ndarray, indices: list[int]) -> float:
-    """Mean frame-to-frame change across the limb joint angles within
-    these (sequence-position) indices -- higher means more motion."""
+def _segment_energy(features: np.ndarray, indices: list[int], fps: float) -> float:
+    """Mean change in the limb joint angles over ENERGY_LAG_SECONDS,
+    within these (sequence-position) indices -- higher means more
+    motion. The lag is converted to frames per clip, so clips recorded at
+    different frame rates are compared over the same real-time interval."""
 
+    # `indices` come straight off the DTW warping path, where a frame is
+    # repeated whenever the other clip has more frames in the same span
+    # (e.g. every 30 fps user frame appears ~twice against a 60 fps
+    # reference). Measuring a "lag" across repeats spans about half the
+    # real time -- so only real, distinct frames count. (Found by
+    # checking a per-window "user has ~0.4x the energy" flag against
+    # whole-clip motion, which was identical between the two clips.)
+    indices = list(dict.fromkeys(indices))
     sub = features[indices][:, _LIMB_FEATURE_INDICES]
-    if len(sub) < 2:
+    lag = max(1, round(fps * ENERGY_LAG_SECONDS))
+    if len(sub) <= lag:
         return 0.0
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=RuntimeWarning)
-        return float(np.nanmean(np.abs(np.diff(sub, axis=0))))
+        return float(np.nanmean(np.abs(sub[lag:] - sub[:-lag])))
 
 
 def _energy_issue(
-    reference_features: np.ndarray, ref_indices: list[int], user_features: np.ndarray, other_indices: list[int]
+    reference_features: np.ndarray,
+    ref_indices: list[int],
+    reference_fps: float,
+    user_features: np.ndarray,
+    other_indices: list[int],
+    user_fps: float,
 ) -> ScoredIssue | None:
-    ref_energy = _segment_energy(reference_features, ref_indices)
+    ref_energy = _segment_energy(reference_features, ref_indices, reference_fps)
     if ref_energy < MIN_REFERENCE_ENERGY_DEG:
         return None  # the reference itself is nearly still here; a ratio would just be noise
 
-    user_energy = _segment_energy(user_features, other_indices)
+    user_energy = _segment_energy(user_features, other_indices, user_fps)
     ratio = user_energy / ref_energy
     if ratio >= ENERGY_RATIO_THRESHOLD:
         return None
@@ -309,6 +362,7 @@ def score_analysis(
     # Captured *before* dtw_align's internal NaN imputation, which would
     # otherwise erase which user frames were actually low-confidence.
     user_nan_mask = np.isnan(user_features)
+    reference_nan_mask = np.isnan(reference_features)
 
     path = dtw_align(reference_features, user_features)
     windows = _segment_path_by_reference_time(
@@ -352,15 +406,24 @@ def score_analysis(
         occlusion_issues, excluded_joints = _occlusion_issues(user_nan_mask, other_indices)
         issues = _angle_issues(mean_abs_diff, excluded_joints) + occlusion_issues
 
-        balance_issue = _balance_issue(mean_abs_diff)
+        balance_issue = _balance_issue(
+            mean_abs_diff, reference_nan_mask, ref_indices, user_nan_mask, other_indices
+        )
         if balance_issue:
             issues.append(balance_issue)
 
-        tempo_issue = _tempo_issue(ref_indices, other_indices)
+        tempo_issue = _tempo_issue(
+            [reference_frame_indices[i] for i in ref_indices],
+            reference_fps,
+            [user_frame_indices[i] for i in other_indices],
+            user_fps,
+        )
         if tempo_issue:
             issues.append(tempo_issue)
 
-        energy_issue = _energy_issue(reference_features, ref_indices, user_features, other_indices)
+        energy_issue = _energy_issue(
+            reference_features, ref_indices, reference_fps, user_features, other_indices, user_fps
+        )
         if energy_issue:
             issues.append(energy_issue)
 

@@ -356,6 +356,36 @@ def test_balance_issue_fires_when_wobble_exceeds_the_reference():
     assert "balance" in flagged_types
 
 
+def test_balance_issue_is_suppressed_when_the_ankles_are_too_low_confidence_to_trust():
+    # Same wobble that fires in the test above -- but here the user's
+    # ankles are barely visible (confidence 0.1, under the 0.3 bar) for
+    # the whole clip, as on real footage framed above the feet. A balance
+    # "wobble" measured from those guesses is noise, so nothing is said.
+    num_frames = 40
+    reference = _animated_sequence_with_wobble(num_frames, extra_wobble_scale=0.0)
+    bad_user = _animated_sequence_with_wobble(num_frames, extra_wobble_scale=9.0)
+    frame_indices = list(range(num_frames))
+
+    confident = [np.full(17, 0.9) for _ in range(num_frames)]
+    unsure_ankles = []
+    for _ in range(num_frames):
+        s = np.full(17, 0.9)
+        s[[L_ANKLE, R_ANKLE]] = 0.1
+        unsure_ankles.append(s)
+
+    with_visible_ankles = score_analysis(
+        reference, frame_indices, 30.0, bad_user, frame_indices, 30.0,
+        reference_scores=confident, user_scores=confident,
+    )
+    with_hidden_ankles = score_analysis(
+        reference, frame_indices, 30.0, bad_user, frame_indices, 30.0,
+        reference_scores=confident, user_scores=unsure_ankles,
+    )
+
+    assert "balance" in _issue_types(with_visible_ankles)
+    assert "balance" not in _issue_types(with_hidden_ankles)
+
+
 def _dampened_animated_sequence(num_frames: int, damp: float) -> list[np.ndarray]:
     """Like _animated_sequence, but the fluctuation *amplitude* of every
     signal is scaled by `damp` around the same mean -- damp=1.0 is
@@ -404,6 +434,36 @@ def test_energy_issue_does_not_fire_when_reference_itself_is_still():
 
     flagged_types = {issue.type for s in result.segments for issue in s.issues}
     assert "energy" not in flagged_types
+
+
+def _issue_types(result) -> set[str]:
+    return {issue.type for segment in result.segments for issue in segment.issues}
+
+
+def test_same_motion_at_different_frame_rates_raises_no_tempo_or_energy_issue_reference_faster():
+    # Regression: the first real-footage run (a ~60 fps reference vs. a
+    # ~30 fps user clip) flagged "tempo" in every window, because the span
+    # check compared raw frame counts instead of seconds. The dancer here
+    # does *exactly* the same motion at the same real-world speed -- only
+    # the recording frame rate differs -- so neither tempo nor energy
+    # (also frame-rate-sensitive, in the other direction) should fire.
+    fast = _animated_sequence(120)  # 2s at 60fps
+    slow = fast[::2]  # the same 2s of motion, sampled at 30fps
+
+    result = score_analysis(fast, list(range(120)), 60.0, slow, list(range(60)), 30.0)
+
+    assert "tempo" not in _issue_types(result)
+    assert "energy" not in _issue_types(result)
+
+
+def test_same_motion_at_different_frame_rates_raises_no_tempo_or_energy_issue_user_faster():
+    fast = _animated_sequence(120)
+    slow = fast[::2]
+
+    result = score_analysis(slow, list(range(60)), 30.0, fast, list(range(120)), 60.0)
+
+    assert "tempo" not in _issue_types(result)
+    assert "energy" not in _issue_types(result)
 
 
 def test_tempo_issue_flags_a_likely_skipped_move():
