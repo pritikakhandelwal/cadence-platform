@@ -55,6 +55,19 @@ test("a video with nobody in it is refused with a reason, and they can try again
   await expect(page.getByRole("button", { name: "Continue" })).toBeEnabled();
 });
 
+test("a reference video with nobody in it is rejected, and the reason says it's the reference", async ({ page }) => {
+  test.skip(needsClips, clipsReason);
+  await openUpload(page);
+
+  await attachAndSubmit(page, USER_VIDEO!, makeEmptyClip(dir));
+  await page.waitForURL(/\/studio\/processing\//);
+
+  // the user's own clip locks fine; it's scoring against the reference that fails
+  await page.waitForURL(/\/studio\/upload\?rejected=/, { timeout: 5 * 60_000 });
+  await expect(page.getByText("Couldn't analyze that video")).toBeVisible();
+  await expect(page.getByText(/^Reference video could not be locked/)).toBeVisible();
+});
+
 test("two people in the video: pick which one is you, then get a real result", async ({ page }) => {
   test.skip(needsClips, clipsReason);
   await openUpload(page);

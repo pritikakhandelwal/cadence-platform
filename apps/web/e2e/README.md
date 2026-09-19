@@ -10,9 +10,9 @@ A real browser against a real running stack. **Local only -- not in CI**: they n
 | `upload.spec.ts` | API | The upload form refuses to continue until both videos are supplied |
 | `responsive.spec.ts` | API | No page scrolls sideways at 390 / 768 / 1440px (landing, login, register, upload in both reference modes) |
 | `analysis.spec.ts` | + worker, real videos | The whole product path: real clips attached to the real `<input type="file">`, real worker, a real score and timeline in the browser |
-| `flows.spec.ts` | + worker, ffmpeg, real videos | A non-YouTube reference link is refused before any download; a video with nobody in it is rejected with a reason; a two-person video goes to the pick page, then to a real result (with an overflow check at three widths on the pick and results pages) |
+| `flows.spec.ts` | + worker, ffmpeg, real videos | A non-YouTube reference link is refused before any download; a video with nobody in it is rejected with a reason; a *reference* video with nobody in it is rejected and the reason says it's the reference; a two-person video goes to the pick page, then to a real result (with an overflow check at three widths on the pick and results pages) |
 
-Not covered: the YouTube-link *happy path* (it would download a real video from the network), a rejected *reference* video, other browsers, and the OS file-picker dialog itself (Playwright drives the real file input, not the dialog).
+Not covered: the YouTube-link *happy path* (it would download a real video from the network), other browsers, and the OS file-picker dialog itself (Playwright drives the real file input, not the dialog).
 
 ## How the suite is structured
 
@@ -20,7 +20,7 @@ Registration is rate-limited (5 per hour per IP), so tests don't each register a
 
 ## Running them
 
-Start the stack (no Docker: see the "No Docker?" note in `apps/worker/README.md`). One shared absolute `DATABASE_URL` for the API and worker, and `REDIS_URL=redis://127.0.0.1:6379` (not `localhost` -- IPv6-first resolution hangs on Windows):
+Start the stack (no Docker: see the "No Docker?" note in `apps/worker/README.md`). The suite has been run against both SQLite and a real Postgres (`pip install pgserver`; point `DATABASE_URL` for the API and worker at `postgresql+psycopg2://postgres@127.0.0.1:<port>/<db>`). One shared absolute `DATABASE_URL` for the API and worker, and `REDIS_URL=redis://127.0.0.1:6379` (not `localhost` -- IPv6-first resolution hangs on Windows):
 
 ```bash
 # from apps/worker, in a venv with api + worker requirements and fakeredis
