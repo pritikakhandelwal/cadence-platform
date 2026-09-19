@@ -83,24 +83,24 @@ export function ResultsClient({ id }: { id: string }) {
 
   return (
     <div className="flex flex-col min-h-screen">
-      <header className="flex items-center justify-between px-16 py-6 border-b border-border">
+      <header className="flex items-center justify-between gap-3 px-5 md:px-16 py-5 md:py-6 border-b border-border">
         <Logo />
         <LinkButton href="/studio/upload" variant="outline" className="!px-5 !py-2.5">
           Analyze another video
         </LinkButton>
       </header>
 
-      <div className="px-16 pt-8 pb-7 flex flex-col gap-[22px]">
-        <div className="bg-white border border-border rounded-[20px] px-9 py-7 flex gap-11 items-center">
+      <div className="px-5 md:px-16 pt-6 md:pt-8 pb-7 flex flex-col gap-[22px]">
+        <div className="bg-white border border-border rounded-[20px] px-5 md:px-9 py-6 md:py-7 flex flex-col sm:flex-row gap-6 md:gap-11 items-center">
           <ScoreGauge score={result.overall?.score ?? null} />
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2 items-center sm:items-start text-center sm:text-left">
             <div className="text-[13px] font-semibold uppercase text-accent" style={{ letterSpacing: "0.06em" }}>
               Overall score
             </div>
             <h1 className="font-serif" style={{ fontSize: 24, fontWeight: 500 }}>
               {result.overall ? `${result.overall.method} · v${result.overall.version}` : "Your result appears here"}
             </h1>
-            <div className="flex gap-8 mt-1.5">
+            <div className="flex flex-wrap justify-center sm:justify-start gap-x-8 gap-y-3 mt-1.5">
               <div>
                 <div className="text-[13px] text-muted">Tracking confidence</div>
                 <div className="text-lg font-semibold">{result.tracking.confidence ? `${confidencePct}%` : "—"}</div>
@@ -117,14 +117,14 @@ export function ResultsClient({ id }: { id: string }) {
           </div>
         </div>
 
-        <div className="bg-white border border-border rounded-[20px] px-9 py-[26px] flex flex-col gap-[18px]">
-          <div className="flex items-center justify-between">
+        <div className="bg-white border border-border rounded-[20px] px-5 md:px-9 py-[26px] flex flex-col gap-[18px]">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <h2 className="font-serif" style={{ fontSize: 20, fontWeight: 500 }}>
               Video comparison
             </h2>
             <VideoToggle value={view} onChange={setView} />
           </div>
-          <div className="relative rounded-2xl overflow-hidden" style={{ height: 340, background: "#171522" }}>
+          <div className="relative rounded-2xl overflow-hidden h-[220px] md:h-[340px]" style={{ background: "#171522" }}>
             <video autoPlay muted loop playsInline className="absolute inset-0 w-full h-full object-cover" />
             <div className="absolute top-4 left-4 bg-white/15 text-white text-xs px-3.5 py-1.5 rounded-full">
               {view === "mine" ? "Your video" : "Reference video"}
@@ -133,7 +133,7 @@ export function ResultsClient({ id }: { id: string }) {
         </div>
 
         {markers.length > 0 ? (
-          <div className="bg-white border border-border rounded-[20px] px-9 py-[26px] flex flex-col gap-5">
+          <div className="bg-white border border-border rounded-[20px] px-5 md:px-9 py-[26px] flex flex-col gap-5">
             <h2 className="font-serif" style={{ fontSize: 20, fontWeight: 500 }}>
               Timeline
             </h2>
@@ -170,7 +170,7 @@ export function ResultsClient({ id }: { id: string }) {
                 return (
                   <div
                     key={marker.key}
-                    className="flex items-start gap-4 px-[18px] py-3.5 border rounded-xl"
+                    className="flex flex-wrap items-start gap-x-4 gap-y-2 px-[18px] py-3.5 border rounded-xl"
                     style={{ borderColor: "#EDE7F9" }}
                   >
                     <div className="font-serif text-sm text-muted w-[50px] flex-shrink-0">{formatTime(marker.t0)}</div>
@@ -180,21 +180,21 @@ export function ResultsClient({ id }: { id: string }) {
                     >
                       {info.label}
                     </div>
-                    <div className="text-sm leading-relaxed">{marker.issue.message}</div>
+                    <div className="text-sm leading-relaxed min-w-0 basis-[200px] flex-1">{marker.issue.message}</div>
                   </div>
                 );
               })}
             </div>
           </div>
         ) : (
-          <div className="bg-white border border-border rounded-[20px] px-9 py-[30px] flex flex-col gap-5">
+          <div className="bg-white border border-border rounded-[20px] px-5 md:px-9 py-[30px] flex flex-col gap-5">
             <div className="text-center flex flex-col gap-1">
               <h2 className="font-serif" style={{ fontSize: 20, fontWeight: 500 }}>
                 What Cadence looks for
               </h2>
               <p className="text-[13px] text-muted">No issues were flagged for this run -- here&apos;s what gets tagged when there are.</p>
             </div>
-            <div className="grid grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {Object.entries(ISSUE_TYPES)
                 .filter(([type]) => type !== "path")
                 .map(([type, info]) => (

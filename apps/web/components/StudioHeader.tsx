@@ -2,7 +2,7 @@ import { Logo } from "./Logo";
 
 export function StudioHeader({ step }: { step: 1 | 2 | 3 }) {
   return (
-    <header className="flex items-center justify-between px-16 py-6 border-b border-border">
+    <header className="flex items-center justify-between px-5 md:px-16 py-5 md:py-6 border-b border-border">
       <Logo />
       <div className="flex items-center gap-2.5 text-[13px] text-muted">
         <span>Step {step} of 3</span>

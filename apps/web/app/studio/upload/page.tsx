@@ -99,13 +99,13 @@ function UploadForm() {
   return (
     <>
       {rejected && (
-        <div className="fixed top-6 right-6 z-10">
+        <div className="fixed top-4 left-4 right-4 md:left-auto md:top-6 md:right-6 z-10">
           <Toast message={rejected} onDismiss={() => setRejected(null)} />
         </div>
       )}
 
       <form onSubmit={handleSubmit} className="flex-grow flex flex-col">
-      <div className="flex-grow flex flex-col items-center justify-center px-16 py-8 gap-[30px]">
+      <div className="flex-grow flex flex-col items-center justify-center px-5 md:px-16 py-6 md:py-8 gap-[30px]">
         <div className="text-center flex flex-col gap-1.5">
           <h1 className="font-serif" style={{ fontSize: 28, fontWeight: 500 }}>
             Add your two videos
@@ -113,7 +113,7 @@ function UploadForm() {
           <p className="text-sm text-muted">Your practice video, and a reference to compare it against.</p>
         </div>
 
-        <div className="grid grid-cols-2 gap-7 w-full max-w-[1140px]">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-7 w-full max-w-[1140px]">
           <div className="flex flex-col gap-3">
             <div className="text-sm font-semibold">Your video</div>
             <Dropzone file={userVideo} onChange={setUserVideo} height={250} />
@@ -170,7 +170,7 @@ function UploadForm() {
           </div>
         </div>
 
-        <div className="flex items-start justify-center gap-11">
+        <div className="flex flex-wrap items-start justify-center gap-x-8 gap-y-4 md:gap-11">
           {[
             {
               label: "Good lighting",
@@ -212,7 +212,7 @@ function UploadForm() {
         {error && <div className="text-sm text-[#B0453D]">{error}</div>}
       </div>
 
-      <footer className="flex justify-end px-16 py-5 border-t border-border">
+      <footer className="flex justify-end px-5 md:px-16 py-5 border-t border-border">
         <Button type="submit" disabled={pending}>
           {pending ? "Uploading..." : "Continue"}
         </Button>

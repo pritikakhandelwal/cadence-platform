@@ -43,7 +43,7 @@ export function PickClient({ id }: { id: string }) {
     <div className="flex flex-col min-h-screen">
       <StudioHeader step={2} />
 
-      <div className="flex-grow flex flex-col items-center justify-center px-16 py-8 gap-[30px]">
+      <div className="flex-grow flex flex-col items-center justify-center px-5 md:px-16 py-6 md:py-8 gap-[30px]">
         <div className="text-center max-w-[560px] flex flex-col gap-1.5">
           <h1 className="font-serif" style={{ fontSize: 26, fontWeight: 500 }}>
             Which one is you?
@@ -56,7 +56,7 @@ export function PickClient({ id }: { id: string }) {
         {!tracks && !error && <div className="text-sm text-muted">Loading candidates...</div>}
 
         {tracks && (
-          <div className="grid grid-cols-3 gap-6 w-full max-w-[1180px]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full max-w-[1180px]">
             {tracks.map((track) => {
               const isSelected = selected === track.track_id;
               return (
@@ -106,7 +106,7 @@ export function PickClient({ id }: { id: string }) {
         </p>
       </div>
 
-      <footer className="flex justify-end px-16 py-5 border-t border-border">
+      <footer className="flex justify-end px-5 md:px-16 py-5 border-t border-border">
         <Button onClick={handleContinue} disabled={selected === null || pending}>
           {pending ? "Locking in..." : "Continue"}
         </Button>

@@ -53,7 +53,7 @@ export function ProcessingClient({ id }: { id: string }) {
 
   return (
     <div className="flex flex-col min-h-screen">
-      <header className="px-16 py-6">
+      <header className="px-5 md:px-16 py-5 md:py-6">
         <Logo />
       </header>
       <div className="flex-grow flex flex-col items-center justify-center gap-[26px] cadence-dotgrid">

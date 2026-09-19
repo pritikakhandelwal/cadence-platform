@@ -42,38 +42,38 @@ const STEPS = [
 export default function Home() {
   return (
     <div className="flex flex-col min-h-screen">
-      <header className="flex items-center justify-between px-16 py-7">
+      <header className="flex items-center justify-between px-5 md:px-16 py-5 md:py-7">
         <Logo />
-        <nav className="flex items-center gap-9">
-          <Link href="#how-it-works" className="text-[15px] no-underline text-ink">
+        <nav className="flex items-center gap-4 md:gap-9">
+          <Link href="#how-it-works" className="hidden sm:inline text-[15px] no-underline text-ink">
             How it works
           </Link>
           <Link href="/login" className="text-[15px] no-underline text-ink">
             Log in
           </Link>
-          <LinkButton href="/studio/upload" className="!px-6 !py-3">
+          <LinkButton href="/studio/upload" className="!px-4 md:!px-6 !py-2.5 md:!py-3">
             Get started
           </LinkButton>
         </nav>
       </header>
 
-      <div className="relative mx-16 rounded-[20px] overflow-hidden flex-shrink-0" style={{ height: 620 }}>
+      <div className="relative mx-5 md:mx-16 rounded-[20px] overflow-hidden flex-shrink-0 h-[560px] md:h-[620px]">
         <video autoPlay muted loop playsInline className="absolute inset-0 w-full h-full object-cover" style={{ background: "#171522" }} />
         <div className="absolute inset-0" style={{ background: "rgba(30, 20, 60, 0.42)" }} />
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-center gap-6 px-20">
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center gap-5 md:gap-6 px-6 md:px-20">
           <div
             className="font-serif italic text-white"
-            style={{ fontSize: 88, lineHeight: 1, fontWeight: 500, letterSpacing: "-0.02em" }}
+            style={{ fontSize: "clamp(56px, 13vw, 88px)", lineHeight: 1, fontWeight: 500, letterSpacing: "-0.02em" }}
           >
             Cadence
           </div>
-          <h1 className="font-serif text-white max-w-[620px]" style={{ fontSize: 32, fontWeight: 500, lineHeight: 1.3 }}>
+          <h1 className="font-serif text-white max-w-[620px]" style={{ fontSize: "clamp(22px, 5vw, 32px)", fontWeight: 500, lineHeight: 1.3 }}>
             Train like a professional, one move at a time.
           </h1>
           <p className="text-white/80 max-w-[500px]" style={{ fontSize: 16, lineHeight: 1.55 }}>
             See exactly where your technique differs, move by move.
           </p>
-          <div className="flex gap-4 mt-1.5">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mt-1.5 w-full sm:w-auto">
             <LinkButton href="/studio/upload" variant="primary">
               Start your analysis
             </LinkButton>
@@ -84,7 +84,7 @@ export default function Home() {
         </div>
       </div>
 
-      <div id="how-it-works" className="flex-grow flex flex-col items-center justify-center gap-10 px-16 py-10">
+      <div id="how-it-works" className="flex-grow flex flex-col items-center justify-center gap-10 px-5 md:px-16 py-10">
         <div className="text-center flex flex-col gap-2">
           <div
             className="text-[13px] font-semibold uppercase text-accent"
@@ -100,7 +100,7 @@ export default function Home() {
         <div className="flex items-start justify-center w-full max-w-[880px]">
           {STEPS.map((step, i) => (
             <div key={step.label} className="contents">
-              <div className="flex flex-col items-center gap-2.5 w-40">
+              <div className="flex flex-col items-center gap-2.5 w-24 sm:w-40">
                 <IconBadge>{step.icon}</IconBadge>
                 <div className="text-[16px] font-semibold">{step.label}</div>
                 <div className="text-[13px] text-muted text-center">{step.caption}</div>
@@ -116,7 +116,7 @@ export default function Home() {
         </div>
       </div>
 
-      <footer className="flex items-center justify-between px-16 py-[22px] border-t border-border">
+      <footer className="flex items-center justify-between px-5 md:px-16 py-[22px] border-t border-border">
         <div className="text-[13px] text-muted">© 2026 Cadence</div>
         <div className="flex gap-6">
           <Link href="#" className="text-[13px] no-underline text-muted">
