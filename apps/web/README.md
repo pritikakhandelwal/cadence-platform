@@ -18,11 +18,12 @@ Open http://localhost:3000.
 
 ```bash
 npm test        # Vitest + React Testing Library, jsdom
+npm run e2e     # Playwright, real browser + real stack -- local only, see e2e/README.md
 npm run lint
 npm run build   # also typechecks (tests included)
 ```
 
-`npm test` runs 48 tests covering `lib/api.ts` (error mapping, the 15s timeout, multipart encoding), the shared components, and the behavior of the processing, pick, results and upload pages. They mock `@/lib/api` and `next/navigation`, so they prove each page does the right thing *given* a response -- not that the real API returns that shape. Mutation-checked: deliberately breaking the gauge's clamping, the client timeout, and the processing page's redirect-once guard each turned exactly one test red. jsdom is not a browser, and there are no end-to-end tests (Playwright etc.) and no visual-regression tests.
+`npm test` runs 59 tests covering `lib/api.ts` (error mapping, the 15s timeout, multipart encoding), the shared components, and the behavior of every page (landing, login, register, upload, processing, pick, results). They mock `@/lib/api` and `next/navigation`, so they prove each page does the right thing *given* a response -- not that the real API returns that shape. Mutation-checked: deliberately breaking the gauge's clamping, the client timeout, and the processing page's redirect-once guard each turned exactly one test red. jsdom is not a browser, so a separate Playwright suite (`e2e/`, local only, not in CI) drives real Edge against the real API, queue and worker -- including attaching real videos to the actual file inputs. There are no visual-regression tests.
 
 ## What's here
 
@@ -38,7 +39,7 @@ npm run build   # also typechecks (tests included)
 
 **Not yet:**
 - **Real Redis and Postgres still haven't been used** (no Docker here). The full path -- upload -> API -> queue -> real worker -> scored result -> this UI's processing page polling and auto-redirecting to Results -- *has* been verified end to end on the two real dance clips, but against a pure-Python fake Redis (`apps/worker/scripts/dev_fake_redis.py`) and SQLite. That retires "is the wiring right," not "does it behave on real infrastructure." One trap found along the way: `REDIS_URL` must say `127.0.0.1`, not `localhost`, on Windows (IPv6-first resolution hangs). Before that was set up, `POST /analyses` and `POST /analyses/{id}/lock` blocked forever on `arq.create_pool` trying to reach Redis -- hence the client-side timeout in `lib/api.ts`.
-- **File uploads weren't exercised through the real browser file picker** -- this session's browser-automation tools can't drive the native OS file dialog `<input type="file">` opens. The end-to-end run above submitted the same multipart request with `curl`, so the endpoint and everything after it is proven; `Dropzone` itself is verified only by code review and the build/typecheck passing.
-- Test gaps: no tests for the landing, login or register pages; no e2e or visual tests; the page tests mock the API client, so frontend/backend contract drift is caught only by the shared `@cadence/schema` types, not by a test.
+- **The native OS file-picker *dialog* still hasn't been clicked through** -- no tooling here can drive it. But Playwright's `setInputFiles` drives the real `<input type="file">` that dialog would fill, so the form, `Dropzone`, the multipart upload, the worker and the results page have now been exercised in a real browser with the real clips (`e2e/analysis.spec.ts`: score 38.6, matching the direct runs).
+- Test gaps: the unit/page tests mock the API client, so frontend/backend contract drift is caught only by the shared `@cadence/schema` types and the e2e suite; the e2e suite is local-only (needs Redis, a worker with ML dependencies, and real videos, so it can't run in CI), drives Edge only, and covers one happy path plus auth -- not the dancer-pick flow, a rejected video, or the YouTube-link option; no visual-regression tests.
 - Responsive layout is mobile-first (`md` = 768px is where it becomes the desktop layout) and was checked by eye at **390px and 1440px only** -- not at tablet width, and not on a real device. The video areas are still empty placeholders (there's no real video URL to play yet), so how they behave with real footage on a phone is unverified.
 - CORS in `apps/api/app/main.py` hardcodes `http://localhost:3000` as the only allowed origin -- fine for local dev, needs a real origin (and probably an env var) before this points at anything deployed.
