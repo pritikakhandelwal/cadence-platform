@@ -37,9 +37,15 @@ def get_db() -> Iterator[Session]:
 
 
 def init_db() -> None:
-    """Create tables that don't exist yet. Fine for now; move to real
-    migrations (Alembic) before Phase 7 if the schema needs to evolve
-    without dropping data."""
+    """Create tables that don't exist yet -- for dev and tests.
+
+    `create_all` never alters an existing table, so it can't carry a database
+    through a schema change. For any database whose data must survive, use the
+    Alembic migrations instead (`alembic upgrade head` from packages/db).
+    Don't mix the two on one database: one built by `create_all` has no
+    `alembic_version` table, so a later `upgrade head` would try to create
+    tables that already exist. apps/api/tests/test_migrations.py keeps the two
+    schema sources identical."""
 
     from . import models  # noqa: F401  (registers models on Base)
 

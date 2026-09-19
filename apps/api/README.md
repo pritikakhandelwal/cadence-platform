@@ -51,7 +51,7 @@ Tests use a temp SQLite file per test and generate a tiny real MP4 with `ffmpeg`
 CADENCE_TEST_DATABASE_URL=postgresql+psycopg2://user:pass@localhost:5432/cadence_test pytest
 ```
 
-CI does this against a Postgres service container, with the server set to a non-UTC time zone. No Docker locally? `pip install pgserver` gives a self-contained Postgres (`pgserver.get_server(path).get_uri()`), which is how this was first checked. `tests/test_datetime_roundtrip.py` only has teeth when the server's time zone isn't UTC (`ALTER DATABASE ... SET timezone = 'Asia/Kolkata'`).
+CI does this against a Postgres service container, with the server set to a non-UTC time zone. `tests/test_migrations.py` also runs the Alembic migrations against whichever database that is and checks they produce exactly the models' schema. No Docker locally? `pip install pgserver` gives a self-contained Postgres (`pgserver.get_server(path).get_uri()`), which is how this was first checked. `tests/test_datetime_roundtrip.py` only has teeth when the server's time zone isn't UTC (`ALTER DATABASE ... SET timezone = 'Asia/Kolkata'`).
 
 ## Cleanup job
 
